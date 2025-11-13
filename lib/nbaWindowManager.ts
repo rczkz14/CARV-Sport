@@ -4,8 +4,8 @@
  * 
  * NBA Window (WIB = UTC+7):
  * - Opens: 13:00 WIB (D)
- * - Closes: 04:00 WIB (D+1)
- * - In UTC: 06:00 — 21:00 UTC (same day)
+ * - Closes: 06:30 WIB (D+1)
+ * - In UTC: 06:00 — 23:30 UTC (same day)
  * 
  * For Matches Tab:
  * - Show only D+1 matches (next calendar day)
@@ -28,24 +28,27 @@ export function getNBAWindowStatus(nowUtc: Date = new Date()) {
   const utcHour = nowUtc.getUTCHours();
   const wibHour = utcToWIB(utcHour);
 
-  // NBA window in WIB: 13:00 — 04:00 (next day)
-  // In UTC: 06:00 — 21:00 same UTC day
-  const isOpen = utcHour >= 6 && utcHour < 21;
+  // NBA window in WIB: 13:00 — 06:30 (next day)
+  // In UTC: 06:00 — 23:30 same UTC day
+  const utcMinutes = nowUtc.getUTCHours() * 60 + nowUtc.getUTCMinutes();
+  const openMinutes = 6 * 60; // 06:00 UTC
+  const closeMinutes = 23 * 60 + 30; // 23:30 UTC
+  const isOpen = utcMinutes >= openMinutes && utcMinutes < closeMinutes;
 
-  // Calculate hours until next transition
-  let hoursUntilNextChange: number;
+  // Calculate minutes until next transition
+  let minutesUntilNextChange: number;
   let isOpeningNext: boolean;
 
   if (isOpen) {
-    // Window is open, next change is CLOSE at 21:00 UTC
-    hoursUntilNextChange = 21 - utcHour;
+    // Window is open, next change is CLOSE at 23:30 UTC
+    minutesUntilNextChange = closeMinutes - utcMinutes;
     isOpeningNext = false; // Next event is close
   } else {
     // Window is closed, next change is OPEN at 06:00 UTC
-    if (utcHour < 6) {
-      hoursUntilNextChange = 6 - utcHour;
+    if (utcMinutes < openMinutes) {
+      minutesUntilNextChange = openMinutes - utcMinutes;
     } else {
-      hoursUntilNextChange = 24 - (utcHour - 6); // Next day at 06:00
+      minutesUntilNextChange = 24 * 60 - (utcMinutes - openMinutes); // Next day at 06:00
     }
     isOpeningNext = true; // Next event is open
   }
@@ -54,7 +57,7 @@ export function getNBAWindowStatus(nowUtc: Date = new Date()) {
     isOpen,
     wibHour,
     utcHour,
-    hoursUntilNextChange,
+    minutesUntilNextChange,
     nextEventIsOpening: isOpeningNext,
   };
 }
