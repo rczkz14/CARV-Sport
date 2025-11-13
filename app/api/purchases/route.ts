@@ -47,6 +47,9 @@ Generated: ${new Date().toLocaleString()}
   }
 }
 
+
+// GET handler for purchases
+export async function GET(request: Request) {
   // support optional query: ?eventId=...&buyer=...
   const url = new URL(request.url);
   const eventId = url.searchParams.get("eventId");
