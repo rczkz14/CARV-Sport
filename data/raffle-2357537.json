@@ -1,0 +1,22 @@
+{
+  "id": "2357537-830b50b0-063a-459c-94d0-a4cb509aab19",
+  "eventId": "2357537",
+  "date": "2025-11-13",
+  "winners": [
+    "9g9bDwgrSq8Ssk2wtAtot9bewJhcQXMynUHmR33mFFXe"
+  ],
+  "buyerCount": 1,
+  "entries": [
+    {
+      "id": "2357537-a87ec4d4-b95e-4015-9398-bdd2b97b967f",
+      "buyer": "9g9bDwgrSq8Ssk2wtAtot9bewJhcQXMynUHmR33mFFXe",
+      "txid": "5a74jE4fqffpxH6KH97L8mzLCUcd4W5TSrLRseT29MGGS84dEz1YxDfDVS51LvfgTg3nnZPewczDoHBPkaYCbetY",
+      "timestamp": "2025-11-12T18:29:26.669Z"
+    }
+  ],
+  "token": "CARV",
+  "createdAt": "2025-11-13T08:00:04.168Z",
+  "prizePool": 0.5,
+  "winnerPayout": 0.4,
+  "txHash": "486zdxwTxWQtfRJJZkS4d8J2z6vZEZUH2Zu5etBAFcQhejbWCVGwpa1paEnSr62CtPY6pa3neSy4kW1JKZNBAY7a"
+}

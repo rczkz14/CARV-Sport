@@ -1,0 +1,26 @@
+{
+  "eventId": "2357540",
+  "matchDetails": {
+    "home": "Utah Jazz",
+    "away": "Atlanta Hawks",
+    "league": "NBA",
+    "datetime": "2025-11-14T02:00:00",
+    "venue": "Delta Center"
+  },
+  "prediction": {
+    "predictedScore": "116-99",
+    "totalScore": 215,
+    "predictedWinner": "Utah Jazz",
+    "confidence": 69,
+    "review": "Utah Jazz demonstrates why they're genuine title contenders while Atlanta Hawks shows they're not at this level. The gulf is vast and undeniable. Atlanta Hawks's defensive rotations are two steps behind. Utah Jazz's bench unit provides scoring punch off the bench. A crucial three-pointer from Atlanta Hawks with under two minutes remaining sealed the outcome. Atlanta Hawks's injury situation forces unexpected lineup combinations.",
+    "generatedAt": "2025-11-13T07:20:57.057Z"
+  },
+  "predictionText": "Prediction\n\n🏀 Utah Jazz vs Atlanta Hawks\nPredicted Score: 116-99\nTotal Score: 215\nPredicted Winner: Utah Jazz\nConfidence: 69%\n\nReview:\nUtah Jazz demonstrates why they're genuine title contenders while Atlanta Hawks shows they're not at this level. The gulf is vast and undeniable. Atlanta Hawks's defensive rotations are two steps behind. Utah Jazz's bench unit provides scoring punch off the bench. A crucial three-pointer from Atlanta Hawks with under two minutes remaining sealed the outcome. Atlanta Hawks's injury situation forces unexpected lineup combinations.\n\nGenerated: 2025-11-13T07:20:57.057Z",
+  "actualWinner": null,
+  "actualResult": null,
+  "isCorrect": null,
+  "homeScore": null,
+  "awayScore": null,
+  "status": null,
+  "createdAt": "2025-11-13T07:20:57.057Z"
+}

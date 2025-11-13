@@ -1,0 +1,26 @@
+{
+  "eventId": "2357538",
+  "matchDetails": {
+    "home": "Cleveland Cavaliers",
+    "away": "Toronto Raptors",
+    "league": "NBA",
+    "datetime": "2025-11-14T00:00:00",
+    "venue": "Rocket Arena"
+  },
+  "prediction": {
+    "predictedScore": "122-99",
+    "totalScore": 221,
+    "predictedWinner": "Cleveland Cavaliers",
+    "confidence": 56,
+    "review": "A showcase game for Cleveland Cavaliers, who plays at a different level entirely. Toronto Raptors has no answers for Cleveland Cavaliers's pace and spacing. Garbage time basketball from the second half onward. Cleveland Cavaliers's transition defense leaves shooters wide open. Toronto Raptors's mid-range game provides reliable scoring. Cleveland Cavaliers forces a turnover in the final possession to secure victory. Cleveland Cavaliers's complementary scoring prevents opponent from focusing on one star.",
+    "generatedAt": "2025-11-13T07:20:57.049Z"
+  },
+  "predictionText": "Prediction\n\n🏀 Cleveland Cavaliers vs Toronto Raptors\nPredicted Score: 122-99\nTotal Score: 221\nPredicted Winner: Cleveland Cavaliers\nConfidence: 56%\n\nReview:\nA showcase game for Cleveland Cavaliers, who plays at a different level entirely. Toronto Raptors has no answers for Cleveland Cavaliers's pace and spacing. Garbage time basketball from the second half onward. Cleveland Cavaliers's transition defense leaves shooters wide open. Toronto Raptors's mid-range game provides reliable scoring. Cleveland Cavaliers forces a turnover in the final possession to secure victory. Cleveland Cavaliers's complementary scoring prevents opponent from focusing on one star.\n\nGenerated: 2025-11-13T07:20:57.049Z",
+  "actualWinner": null,
+  "actualResult": null,
+  "isCorrect": null,
+  "homeScore": null,
+  "awayScore": null,
+  "status": null,
+  "createdAt": "2025-11-13T07:20:57.049Z"
+}

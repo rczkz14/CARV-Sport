@@ -1,0 +1,26 @@
+{
+  "eventId": "2357539",
+  "matchDetails": {
+    "home": "Phoenix Suns",
+    "away": "Indiana Pacers",
+    "league": "NBA",
+    "datetime": "2025-11-14T02:00:00",
+    "venue": "PHX Arena"
+  },
+  "prediction": {
+    "predictedScore": "96-95",
+    "totalScore": 191,
+    "predictedWinner": "Phoenix Suns",
+    "confidence": 68,
+    "review": "Phoenix Suns trades buckets with Indiana Pacers for three quarters before separating slightly in the fourth. The margin remains tight throughout. Phoenix Suns's rebounding position allows second-chance buckets. Indiana Pacers's star player creates for others when double-teamed. Free throw shooting with the game on the line separates the teams. Phoenix Suns's starter lineup controls tempo but the bench cannot maintain it.",
+    "generatedAt": "2025-11-13T07:20:57.040Z"
+  },
+  "predictionText": "Prediction\n\n🏀 Phoenix Suns vs Indiana Pacers\nPredicted Score: 96-95\nTotal Score: 191\nPredicted Winner: Phoenix Suns\nConfidence: 68%\n\nReview:\nPhoenix Suns trades buckets with Indiana Pacers for three quarters before separating slightly in the fourth. The margin remains tight throughout. Phoenix Suns's rebounding position allows second-chance buckets. Indiana Pacers's star player creates for others when double-teamed. Free throw shooting with the game on the line separates the teams. Phoenix Suns's starter lineup controls tempo but the bench cannot maintain it.\n\nGenerated: 2025-11-13T07:20:57.040Z",
+  "actualWinner": null,
+  "actualResult": null,
+  "isCorrect": null,
+  "homeScore": null,
+  "awayScore": null,
+  "status": null,
+  "createdAt": "2025-11-13T07:20:57.040Z"
+}

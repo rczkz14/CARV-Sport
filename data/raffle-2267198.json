@@ -1,0 +1,19 @@
+{
+  "eventId": "2267198",
+  "league": "EPL",
+  "matchDetails": {
+    "home": "Manchester City",
+    "away": "Leeds United",
+    "league": "English Premier League",
+    "datetime": "2025-11-29T15:00:00Z",
+    "venue": "Etihad Stadium"
+  },
+  "prediction": "Over 2.5",
+  "scorePrediction": "1-0",
+  "story": "Form and fixture analysis indicates open and entertaining football with plenty of goals. Manchester City at home could be decisive. Over 2.5 expected.",
+  "actualWinner": null,
+  "actualResult": null,
+  "isCorrect": null,
+  "actualTotalGoals": null,
+  "createdAt": "2025-11-12T18:03:54.918Z"
+}

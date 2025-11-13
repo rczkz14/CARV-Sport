@@ -1,0 +1,37 @@
+{
+  "matches": [
+    {
+      "id": "2357529",
+      "home": "Boston Celtics",
+      "away": "Memphis Grizzlies",
+      "homeScore": null,
+      "awayScore": null,
+      "status": "NS",
+      "datetime": "2025-11-13T00:30:00",
+      "venue": "TD Garden",
+      "archived": "2025-11-13T02:15:28.428Z"
+    },
+    {
+      "id": "2357528",
+      "home": "New York Knicks",
+      "away": "Orlando Magic",
+      "homeScore": null,
+      "awayScore": null,
+      "status": "NS",
+      "datetime": "2025-11-13T00:00:00",
+      "venue": "Madison Square Garden",
+      "archived": "2025-11-13T02:15:28.428Z"
+    },
+    {
+      "id": "2357537",
+      "home": "Los Angeles Clippers",
+      "away": "Denver Nuggets",
+      "homeScore": null,
+      "awayScore": null,
+      "status": "NS",
+      "datetime": "2025-11-13T03:30:00",
+      "venue": "Intuit Dome",
+      "archived": "2025-11-13T02:15:28.428Z"
+    }
+  ]
+}
