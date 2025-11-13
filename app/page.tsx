@@ -431,7 +431,7 @@ export default function Page() {
           try {
             const res = await fetch(`/api/purchases/count?eventid=${id}`);
             const j = await res.json();
-            counts[id] = j.buyerCount ?? 0;
+            counts[id] = j.count ?? 0;
           } catch (e) {
             counts[id] = 0;
           }
