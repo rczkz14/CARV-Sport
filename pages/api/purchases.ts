@@ -28,22 +28,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Debug: Log every API call
   console.log('[API] /api/purchases called', req.method, req.body || req.query);
   try {
+    // GET /api/purchases/count?eventid=xxx
+    if (req.method === 'GET' && req.url?.includes('/count')) {
+      const { eventid } = req.query;
+      if (!eventid) {
+        return res.status(400).json({ error: 'eventid required' });
+      }
+      const { count, error } = await supabase
+        .from('purchases')
+        .select('buyer', { count: 'exact', head: true })
+        .eq('eventid', eventid);
+      if (error) {
+        return res.status(500).json({ error: error.message });
+      }
+      return res.status(200).json({ count });
+    }
+
+    // GET /api/purchases?eventid=xxx&buyer=yyy
     if (req.method === 'GET') {
-    const { eventid, buyer } = req.query;
-    let query = supabase.from('purchases').select('*');
-    if (eventid && buyer) {
-      query = query.eq('eventid', eventid).eq('buyer', buyer);
-    } else if (eventid) {
-      query = query.eq('eventid', eventid);
-    } else if (buyer) {
-      query = query.eq('buyer', buyer);
+      const { eventid, buyer } = req.query;
+      let query = supabase.from('purchases').select('*');
+      if (eventid && buyer) {
+        query = query.eq('eventid', eventid).eq('buyer', buyer);
+      } else if (eventid) {
+        query = query.eq('eventid', eventid);
+      } else if (buyer) {
+        query = query.eq('buyer', buyer);
+      }
+      const { data, error } = await query;
+      if (error) {
+        return res.status(500).json({ error: error.message });
+      }
+      return res.status(200).json({ purchases: data });
     }
-    const { data, error } = await query;
-    if (error) {
-      return res.status(500).json({ error: error.message });
-    }
-    return res.status(200).json({ purchases: data });
-  }
 
     if (req.method === 'POST') {
       const { eventid, buyer, txid, amount, token, prediction } = req.body;
