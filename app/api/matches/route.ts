@@ -116,7 +116,10 @@ function mergeWithLiveData(cachedData: any, liveData: any[]): any {
  */
 function getWindowStatusUtc(nowUtc: Date) {
   const hour = nowUtc.getUTCHours();
-  const openNBA = hour >= 6 && hour < 21;            // 06:00..20:59 UTC
+  const minute = nowUtc.getUTCMinutes();
+  const utcMinutes = hour * 60 + minute;
+  // NBA window: 06:00–23:30 UTC
+  const openNBA = utcMinutes >= 360 && utcMinutes < 1410; // 360 = 6*60, 1410 = 23*60+30
   const openEPL = hour >= 18 || hour < 9;            // 18:00..23:59 OR 00:00..08:59 UTC
   const openLaLiga = hour >= 18 || hour < 9;         // Same as EPL (Spanish league)
   return { openNBA, openEPL, openLaLiga, hour };
