@@ -25,7 +25,10 @@ async function generatePrediction(match: any) {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method === 'GET') {
+  // Debug: Log every API call
+  console.log('[API] /api/purchases called', req.method, req.body || req.query);
+  try {
+    if (req.method === 'GET') {
     const { eventId, buyer } = req.query;
     let query = supabase.from('purchases').select('*');
     if (eventId && buyer) {
@@ -42,22 +45,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ purchases: data });
   }
 
-  if (req.method === 'POST') {
-    const { eventId, buyer, txid, amount, token, prediction } = req.body;
+    if (req.method === 'POST') {
+      const { eventId, buyer, txid, amount, token, prediction } = req.body;
     if (!eventId || !buyer) {
       return res.status(400).json({ error: 'eventId and buyer required' });
     }
-    const { data: existing, error: existingError } = await supabase
-      .from('purchases')
-      .select('*')
-      .eq('eventId', eventId)
-      .eq('buyer', buyer);
-    if (existingError) {
-      return res.status(500).json({ error: existingError.message });
-    }
-    if (existing && existing.length > 0) {
-      return res.status(409).json({ error: 'Already purchased this event by this wallet' });
-    }
+      const { data: existing, error: existingError } = await supabase
+        .from('purchases')
+        .select('*')
+        .eq('eventId', eventId)
+        .eq('buyer', buyer);
+      if (existingError) {
+        console.error('[API] Supabase select error:', existingError.message);
+        return res.status(500).json({ error: existingError.message });
+      }
+      if (existing && existing.length > 0) {
+        console.warn('[API] Already purchased:', { eventId, buyer });
+        return res.status(409).json({ error: 'Already purchased this event by this wallet' });
+      }
     let finalPrediction = prediction;
     if (!finalPrediction) {
       // You may need to adjust the fetch URL for your environment
@@ -71,22 +76,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         finalPrediction = 'Match details not found. Prediction unavailable.';
       }
     }
-    const rec = {
-      id: `${eventId}-${uuidv4()}`,
-      eventId,
-      buyer,
-      txid: txid ?? null,
-      amount: amount ?? null,
-      token: token ?? null,
-      prediction: finalPrediction,
-      timestamp: new Date().toISOString(),
-    };
-    const { error: insertError } = await supabase.from('purchases').insert([rec]);
-    if (insertError) {
-      return res.status(500).json({ error: insertError.message });
-    }
-    return res.status(200).json({ ok: true, purchase: rec });
+      const rec = {
+        id: `${eventId}-${uuidv4()}`,
+        eventId,
+        buyer,
+        txid: txid ?? null,
+        amount: amount ?? null,
+        token: token ?? null,
+        prediction: finalPrediction,
+        timestamp: new Date().toISOString(),
+      };
+      const { error: insertError } = await supabase.from('purchases').insert([rec]);
+      if (insertError) {
+        console.error('[API] Supabase insert error:', insertError.message);
+        return res.status(500).json({ error: insertError.message });
+      }
+      console.log('[API] Purchase inserted:', rec);
+      return res.status(200).json({ ok: true, purchase: rec });
   }
 
-  res.status(405).end();
+    res.status(405).end();
+  } catch (err) {
+    console.error('[API] Unexpected error:', err);
+    res.status(500).json({ error: 'Unexpected server error', details: String(err) });
+  }
 }
