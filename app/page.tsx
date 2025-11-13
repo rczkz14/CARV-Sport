@@ -807,8 +807,10 @@ export default function Page() {
       const q = new URLSearchParams();
       q.set("eventId", ev.id);
       q.set("buyer", publicKey);
+      console.log(`[Debug] Looking for purchase: eventId=${ev.id}, buyer=${publicKey}`);
       const res = await fetch(`/api/purchases?${q.toString()}`);
       const j = await res.json();
+      console.log(`[Debug] Purchase lookup result:`, j);
       let found = Array.isArray(j.purchases) && j.purchases[0];
       
       // If not a buyer, allow viewing if match is finished
@@ -819,7 +821,10 @@ export default function Page() {
         found = Array.isArray(j2.purchases) && j2.purchases[0];
         if (!found) { alert("No prediction available for this match yet."); return; }
       } else if (!found) { 
-        alert("Purchase record not found. Match must be finished to view predictions."); 
+        // Show debugging info before alerting
+        console.log(`[Debug] No purchase found. Available purchases for this event:`, 
+                   j.purchases || 'none');
+        alert(`Purchase record not found. Match must be finished to view predictions.\n\nDebug: eventId=${ev.id}, buyer=${publicKey}`); 
         return; 
       }
       

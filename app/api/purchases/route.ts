@@ -1,40 +1,8 @@
 // app/api/purchases/route.ts
-import fs from "fs";
-import path from "path";
+
 import { NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
-
-const DATA_DIR = path.resolve(process.cwd(), "data");
-const PURCHASES_FILE = path.join(DATA_DIR, "purchases.json");
-
-function readPurchases() {
-  if (!fs.existsSync(PURCHASES_FILE)) return { purchases: [] };
-  try {
-    return JSON.parse(fs.readFileSync(PURCHASES_FILE, "utf-8"));
-  } catch {
-    return { purchases: [] };
-  }
-}
-function writePurchases(obj: any) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(PURCHASES_FILE, JSON.stringify(obj, null, 2));
-}
-
-const PREDICTIONS_FILE = path.join(DATA_DIR, "predictions.json");
-
-function readPredictions() {
-  if (!fs.existsSync(PREDICTIONS_FILE)) return { predictions: {} };
-  try {
-    return JSON.parse(fs.readFileSync(PREDICTIONS_FILE, "utf-8"));
-  } catch {
-    return { predictions: {} };
-  }
-}
-
-function writePredictions(obj: any) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(PREDICTIONS_FILE, JSON.stringify(obj, null, 2));
-}
+import { supabase } from "@/lib/supabaseClient";
 
 async function generatePrediction(match: any) {
   try {
@@ -78,25 +46,24 @@ Generated: ${new Date().toLocaleString()}
   }
 }
 
-export async function GET(request: Request) {
   // support optional query: ?eventId=...&buyer=...
   const url = new URL(request.url);
   const eventId = url.searchParams.get("eventId");
   const buyer = url.searchParams.get("buyer");
 
-  const data = readPurchases();
-  if (!eventId && !buyer) {
-    return NextResponse.json(data);
+  let query = supabase.from("purchases").select("*");
+  if (eventId && buyer) {
+    query = query.eq("eventId", eventId).eq("buyer", buyer);
+  } else if (eventId) {
+    query = query.eq("eventId", eventId);
+  } else if (buyer) {
+    query = query.eq("buyer", buyer);
   }
-
-  const filtered = (data.purchases ?? []).filter((p: any) => {
-    if (eventId && buyer) return p.eventId === eventId && p.buyer === buyer;
-    if (eventId) return p.eventId === eventId;
-    if (buyer) return p.buyer === buyer;
-    return false;
-  });
-
-  return NextResponse.json({ purchases: filtered });
+  const { data, error } = await query;
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  return NextResponse.json({ purchases: data });
 }
 
 export async function POST(request: Request) {
@@ -107,29 +74,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "eventId and buyer required" }, { status: 400 });
   }
 
-  const data = readPurchases();
-  data.purchases = data.purchases ?? [];
-  const predictionData = readPredictions();
-
   // enforce one purchase per buyer per event
-  if (data.purchases.some((p: any) => p.eventId === eventId && p.buyer === buyer)) {
+  const { data: existing, error: existingError } = await supabase
+    .from("purchases")
+    .select("*")
+    .eq("eventId", eventId)
+    .eq("buyer", buyer);
+  if (existingError) {
+    return NextResponse.json({ error: existingError.message }, { status: 500 });
+  }
+  if (existing && existing.length > 0) {
     return NextResponse.json({ error: "Already purchased this event by this wallet" }, { status: 409 });
   }
 
-  // Check if we already have a prediction for this event
-  let finalPrediction = predictionData.predictions[eventId];
-
-  // If no prediction exists yet, generate one for the first buyer
+  // Use provided prediction or fallback
+  let finalPrediction = prediction;
   if (!finalPrediction) {
     // Get match details from the matches API
     const matchRes = await fetch(`${request.headers.get("origin")}/api/matches`);
     const matchData = await matchRes.json();
     const match = matchData.events?.find((e: any) => String(e.id) === String(eventId));
-    
     if (match) {
       finalPrediction = await generatePrediction(match);
-      predictionData.predictions[eventId] = finalPrediction;
-      writePredictions(predictionData);
     } else {
       finalPrediction = "Match details not found. Prediction unavailable.";
     }
@@ -146,8 +112,10 @@ export async function POST(request: Request) {
     timestamp: new Date().toISOString(),
   };
 
-  data.purchases.push(rec);
-  writePurchases(data);
+  const { error: insertError } = await supabase.from("purchases").insert([rec]);
+  if (insertError) {
+    return NextResponse.json({ error: insertError.message }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true, purchase: rec });
 }
