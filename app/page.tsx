@@ -674,17 +674,20 @@ export default function Page() {
           const txid = await connection.sendRawTransaction(raw);
           try { await connection.confirmTransaction({ signature: txid, blockhash, lastValidBlockHeight }, "confirmed"); } catch (c) { console.warn("confirm warn", c); }
 
-          await fetch("/api/purchases", {
+          const purchaseRes = await fetch("/api/purchases", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ eventId: ev.id, buyer: walletPubKeyStr, txid, amount: CARV_CHARGE, token: "CARV" }),
           });
-
+          const purchaseJson = await purchaseRes.json();
+          if (!purchaseRes.ok) {
+            console.error("Purchase API error:", purchaseJson.error);
+            alert("Purchase failed: " + (purchaseJson.error || "Unknown error"));
+            return;
+          }
           setPurchasedByWallet(prev => ({ ...prev, [ev.id]: true }));
-          
           // Refresh buyer counts to show the new purchase immediately
           await fetchBuyerCounts([ev.id]);
-          
           setPurchasedEvent(ev);
           setShowSuccessModal(true);
           return;
@@ -699,17 +702,19 @@ export default function Page() {
           const sig = res?.signature ?? res;
           try { await connection.confirmTransaction({ signature: String(sig), blockhash, lastValidBlockHeight }, "confirmed"); } catch (c) { console.warn("confirm warn", c); }
 
-          await fetch("/api/purchases", {
+          const purchaseRes = await fetch("/api/purchases", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ eventId: ev.id, buyer: walletPubKeyStr, txid: String(sig), amount: CARV_CHARGE, token: "CARV" }),
           });
-
+          const purchaseJson = await purchaseRes.json();
+          if (!purchaseRes.ok) {
+            console.error("Purchase API error:", purchaseJson.error);
+            alert("Purchase failed: " + (purchaseJson.error || "Unknown error"));
+            return;
+          }
           setPurchasedByWallet(prev => ({ ...prev, [ev.id]: true }));
-          
-          // Refresh buyer counts to show the new purchase immediately
           await fetchBuyerCounts([ev.id]);
-          
           // Show success modal
           const modal = document.createElement("div");
           modal.className = "fixed inset-0 flex items-center justify-center z-50";
@@ -746,15 +751,18 @@ export default function Page() {
           const txid = await provider.sendTransaction(tx, connection);
           try { await connection.confirmTransaction({ signature: String(txid), blockhash, lastValidBlockHeight }, "confirmed"); } catch (c) { console.warn("confirm warn", c); }
 
-          await fetch("/api/purchases", {
+          const purchaseRes = await fetch("/api/purchases", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ eventId: ev.id, buyer: walletPubKeyStr, txid, amount: CARV_CHARGE, token: "CARV" }),
           });
-
+          const purchaseJson = await purchaseRes.json();
+          if (!purchaseRes.ok) {
+            console.error("Purchase API error:", purchaseJson.error);
+            alert("Purchase failed: " + (purchaseJson.error || "Unknown error"));
+            return;
+          }
           setPurchasedByWallet(prev => ({ ...prev, [ev.id]: true }));
-          
-          // Show success modal
           setPurchasedEvent(ev);
           setShowSuccessModal(true);
           return;
@@ -767,11 +775,17 @@ export default function Page() {
       if (manual) {
         const txid = prompt("Paste txid here:");
         if (txid) {
-          await fetch("/api/purchases", {
+          const purchaseRes = await fetch("/api/purchases", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ eventId: ev.id, buyer: walletPubKeyStr, txid, amount: CARV_CHARGE, token: "CARV" }),
           });
+          const purchaseJson = await purchaseRes.json();
+          if (!purchaseRes.ok) {
+            console.error("Purchase API error:", purchaseJson.error);
+            alert("Purchase failed: " + (purchaseJson.error || "Unknown error"));
+            return;
+          }
           setPurchasedByWallet(prev => ({ ...prev, [ev.id]: true }));
           setPurchasedEvent(ev);
           setShowSuccessModal(true);
