@@ -76,8 +76,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         finalPrediction = 'Match details not found. Prediction unavailable.';
       }
     }
-          const rec = {
-        eventId,
+            const rec = {
+          eventId,
         buyer,
         txid: txid ?? null,
         amount: amount ?? null,
