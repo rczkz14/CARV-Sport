@@ -42,6 +42,7 @@ ${review}
 Generated: ${new Date().toLocaleString()}
     `.trim();
 
+
   } catch (error) {
     console.error("Prediction generation failed:", error);
     return "Prediction generation failed. Please try again later.";
