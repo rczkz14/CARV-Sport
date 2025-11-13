@@ -45,7 +45,7 @@ Generated: ${new Date().toLocaleString()}
     console.error("Prediction generation failed:", error);
     return "Prediction generation failed. Please try again later.";
   }
-}
+// (end of file)
 
 
 // GET handler for purchases
