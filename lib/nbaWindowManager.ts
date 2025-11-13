@@ -84,41 +84,56 @@ export function getNBAWindowStatus(nowUtc: Date = new Date()) {
  * Returns: { startUTC, endUTC, dateStringWIB }
  */
 export function getD1DateRangeWIB(nowUtc: Date = new Date()) {
-  // First, figure out what day it is in WIB RIGHT NOW
-  const nowWIBTime = new Date(nowUtc.getTime() + 7 * 60 * 60 * 1000);
-  
-  // Get today's WIB date
-  const todayWIB = nowWIBTime.toLocaleString('en-US', { 
-    timeZone: 'Asia/Jakarta',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  });
-  
-  const [month, day, year] = todayWIB.split('/');
-  // D+1 is TOMORROW, so add 1 day
-  const todayDate = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)));
-  const d1Date = new Date(todayDate.getTime() + 24 * 60 * 60 * 1000);
-  const d1Year = d1Date.getUTCFullYear();
-  const d1Month = String(d1Date.getUTCMonth() + 1).padStart(2, '0');
-  const d1Day = String(d1Date.getUTCDate()).padStart(2, '0');
-  const dateStringWIB = `${d1Year}-${d1Month}-${d1Day}`;
+   // First, figure out what day it is in WIB RIGHT NOW
+   const nowWIBTime = new Date(nowUtc.getTime() + 7 * 60 * 60 * 1000);
 
-  // D+1 start: 00:00:00 WIB on D+1 date
-  // Create UTC time: dateStringWIB T 00:00:00 - 7 hours
-  const d1StartWIB = new Date(`${dateStringWIB}T00:00:00Z`);
-  const startUTC = new Date(d1StartWIB.getTime() - 7 * 60 * 60 * 1000);
+   // Get today's WIB date
+   const todayWIB = nowWIBTime.toLocaleString('en-US', {
+     timeZone: 'Asia/Jakarta',
+     year: 'numeric',
+     month: '2-digit',
+     day: '2-digit'
+   });
 
-  // D+1 end: 23:59:59 WIB on D+1 date
-  // Create UTC time: dateStringWIB T 23:59:59 - 7 hours
-  const d1EndWIB = new Date(`${dateStringWIB}T23:59:59Z`);
-  const endUTC = new Date(d1EndWIB.getTime() - 7 * 60 * 60 * 1000);
+   const [month, day, year] = todayWIB.split('/');
+   const todayDate = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)));
 
-  return {
-    startUTC: startUTC.getTime(),
-    endUTC: endUTC.getTime(),
-    dateStringWIB,
-  };
+   // Determine D+1 based on current WIB hour
+   const nowWIBHour = nowWIBTime.getHours() + nowWIBTime.getMinutes() / 60;
+   let d1Date: Date;
+   if (nowWIBHour >= 13) {
+     // Window opened today, D+1 is tomorrow
+     d1Date = new Date(todayDate.getTime() + 24 * 60 * 60 * 1000);
+   } else if (nowWIBHour < 6.5) {
+     // Window opened yesterday, D+1 is today
+     d1Date = todayDate;
+   } else {
+     // Not in window, but function shouldn't be called
+     d1Date = new Date(todayDate.getTime() + 24 * 60 * 60 * 1000);
+   }
+
+   const d1Year = d1Date.getUTCFullYear();
+   const d1Month = String(d1Date.getUTCMonth() + 1).padStart(2, '0');
+   const d1Day = String(d1Date.getUTCDate()).padStart(2, '0');
+   const dateStringWIB = `${d1Year}-${d1Month}-${d1Day}`;
+
+   console.log(`[NBA D+1] D+1 date: ${dateStringWIB}, today WIB: ${todayWIB}, now WIB hour: ${nowWIBHour.toFixed(2)}`);
+
+   // D+1 start: 00:00:00 WIB on D+1 date
+   // Create UTC time: dateStringWIB T 00:00:00 - 7 hours
+   const d1StartWIB = new Date(`${dateStringWIB}T00:00:00Z`);
+   const startUTC = new Date(d1StartWIB.getTime() - 7 * 60 * 60 * 1000);
+
+   // D+1 end: 23:59:59 WIB on D+1 date
+   // Create UTC time: dateStringWIB T 23:59:59 - 7 hours
+   const d1EndWIB = new Date(`${dateStringWIB}T23:59:59Z`);
+   const endUTC = new Date(d1EndWIB.getTime() - 7 * 60 * 60 * 1000);
+
+   return {
+     startUTC: startUTC.getTime(),
+     endUTC: endUTC.getTime(),
+     dateStringWIB,
+   };
 }
 
 /**

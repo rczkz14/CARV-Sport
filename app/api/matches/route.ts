@@ -520,7 +520,7 @@ export async function GET(req: Request) {
     // For live/upcoming mode, filter NBA to D+1 only (history/purchases/closed show all)
     if (!history && !purchasesOnly && !closedWindow) {
       console.log(`[Matches API] Filtering ${nbaMatches.length} NBA matches to D+1 only...`);
-      
+
       // Build a set of all archived matches (in closed windows)
       const archivedMatches = new Set<string>();
       if (windowDates && Array.isArray(windowDates)) {
@@ -530,10 +530,10 @@ export async function GET(req: Request) {
           }
         }
       }
-      
+
       // Check if there's a locked selection for this window
       const lockedIds = await getLockedNBASelection();
-      
+
       if (lockedIds && lockedIds.length > 0) {
         // Use locked selection - filter to only those match IDs that are NOT archived
         const lockedSet = new Set(lockedIds);
@@ -541,13 +541,15 @@ export async function GET(req: Request) {
         console.log(`[Matches API] Using locked selection (excluding archived): ${nbaMatches.map((m: any) => m.id).join(', ')}`);
       } else {
         // No locked selection yet, use D+1 filter (will be locked by auto-predict)
+        console.log(`[Matches API] Before D+1 filter: ${nbaMatches.map((m: any) => `${m.id} (${m.dateEvent})`).join(', ')}`);
         nbaMatches = filterNBAMatchesToD1(nbaMatches, nowUtc);
+        console.log(`[Matches API] After D+1 filter: ${nbaMatches.map((m: any) => `${m.id} (${m.dateEvent})`).join(', ')}`);
         // Also exclude archived matches
         nbaMatches = nbaMatches.filter((m: any) => !archivedMatches.has(String(m.id)));
         console.log(`[Matches API] Using D+1 filter (not yet locked, excluding archived): ${nbaMatches.map((m: any) => m.id).join(', ')}`);
       }
-      
-      console.log(`[Matches API] After D+1 filter: ${nbaMatches.length} NBA matches`);
+
+      console.log(`[Matches API] Final NBA matches after filtering: ${nbaMatches.length}`);
     } else {
       // For history/purchases/closed, apply the old 3-match limit
       nbaMatches = nbaMatches.slice(0, 3);

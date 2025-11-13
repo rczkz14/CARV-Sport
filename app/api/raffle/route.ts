@@ -14,10 +14,10 @@ function pickRandom<T>(arr: T[]) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function getMatchDetailsFromFetch(eventId: string, apiFetchData: any): { home: string; away: string; league: string } | null {
+function getMatchDetailsFromFetch(eventid: string, apiFetchData: any): { home: string; away: string; league: string } | null {
   try {
     // Look in NBA data
-    const nbaMatch = apiFetchData?.nba?.daily?.find((m: any) => String(m.idEvent) === String(eventId));
+    const nbaMatch = apiFetchData?.nba?.daily?.find((m: any) => String(m.idEvent) === String(eventid));
     if (nbaMatch) {
       return {
         home: nbaMatch.strHomeTeam,
@@ -27,8 +27,8 @@ function getMatchDetailsFromFetch(eventId: string, apiFetchData: any): { home: s
     }
 
     // Look in EPL data
-    const eplMatch = apiFetchData?.epl?.league?.find((m: any) => String(m.idEvent) === String(eventId)) || 
-                    apiFetchData?.epl?.daily?.find((m: any) => String(m.idEvent) === String(eventId));
+    const eplMatch = apiFetchData?.epl?.league?.find((m: any) => String(m.idEvent) === String(eventid)) || 
+            apiFetchData?.epl?.daily?.find((m: any) => String(m.idEvent) === String(eventid));
     if (eplMatch) {
       return {
         home: eplMatch.strHomeTeam,
@@ -45,7 +45,7 @@ function getMatchDetailsFromFetch(eventId: string, apiFetchData: any): { home: s
 }
 
 interface RaffleResult {
-  eventId: string;
+  eventid: string;
   matchDetails: {
     home: string;
     away: string;
@@ -61,18 +61,18 @@ interface RaffleResult {
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
-    const eventId = url.searchParams.get('eventId');
+    const eventid = url.searchParams.get('eventid');
     
     // If eventId is specified, return just that raffle
-    if (eventId) {
-      const raffle = readRaffleData(eventId);
+    if (eventid) {
+      const raffle = readRaffleData(eventid);
       if (!raffle) {
         return NextResponse.json({ ok: false, raffle: null }, { status: 404 });
       }
       
       // Enrich with match details if available
       const apiFetchData = readJson(API_FETCH_FILE, {});
-      const matchDetails = getMatchDetailsFromFetch(eventId, apiFetchData);
+      const matchDetails = getMatchDetailsFromFetch(eventid, apiFetchData);
       
       return NextResponse.json({ 
         ok: true, 
@@ -98,7 +98,7 @@ export async function GET(request: Request) {
         const data = readJson(file, null);
         // Only include files that have winners array (actual raffle drawings, not just predictions)
         if (data && Array.isArray(data.winners) && data.winners.length > 0) {
-          const matchDetails = getMatchDetailsFromFetch(data.eventId, apiFetchData);
+          const matchDetails = getMatchDetailsFromFetch(data.eventid, apiFetchData);
           raffles.push({
             ...data,
             matchDetails: matchDetails || {
@@ -126,13 +126,13 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({} as any));
-    const { eventId, winnersCount = 1, token = "CARV" } = body;
-    if (!eventId) {
-      return NextResponse.json({ error: "eventId required" }, { status: 400 });
+    const { eventid, winnersCount = 1, token = "CARV" } = body;
+    if (!eventid) {
+      return NextResponse.json({ error: "eventid required" }, { status: 400 });
     }
 
     // Check if raffle already exists for this event
-    const existingRaffle = readRaffleData(eventId);
+    const existingRaffle = readRaffleData(eventid);
     if (existingRaffle) {
       return NextResponse.json({ 
         error: "raffle already completed for this event",
@@ -155,7 +155,7 @@ export async function POST(request: Request) {
       }
       
       // Check if this eventId is in a closed window
-      if (!eventIds.has(String(eventId))) {
+      if (!eventIds.has(String(eventid))) {
         return NextResponse.json({ 
           error: "event is not from a closed window (still in active window or not found)" 
         }, { status: 400 });
@@ -177,7 +177,7 @@ export async function POST(request: Request) {
       if (apiFetchData.laliga?.daily) allEvents.push(...apiFetchData.laliga.daily);
       if (apiFetchData.laliga?.league) allEvents.push(...apiFetchData.laliga.league);
 
-      const match = allEvents.find((e: any) => String(e.idEvent) === String(eventId));
+      const match = allEvents.find((e: any) => String(e.idEvent) === String(eventid));
       if (!match) {
         return NextResponse.json({ error: "match not found" }, { status: 404 });
       }
@@ -199,7 +199,7 @@ export async function POST(request: Request) {
     const purchases: any[] = purchasesData.purchases ?? [];
 
     // Filter purchases for this event
-    const entries = purchases.filter(p => String(p.eventId) === String(eventId));
+    const entries = purchases.filter(p => String(p.eventid) === String(eventid));
     if (!entries.length) {
       return NextResponse.json({ error: "no entries for event" }, { status: 400 });
     }
@@ -217,8 +217,8 @@ export async function POST(request: Request) {
 
     // create raffle record
     const rec = {
-      id: `${eventId}-${uuidv4()}`,
-      eventId: String(eventId),
+      id: `${eventid}-${uuidv4()}`,
+      eventid: String(eventid),
       date: new Date().toISOString().slice(0, 10), // YYYY-MM-DD (UTC)
       winners,
       buyerCount: entries.length,
@@ -228,11 +228,11 @@ export async function POST(request: Request) {
     };
 
     // Write to individual file
-    writeRaffleData(eventId, rec);
+    writeRaffleData(eventid, rec);
 
     // Return record with match details
     const apiFetchData = readJson(API_FETCH_FILE, {});
-    const matchDetails = getMatchDetailsFromFetch(eventId, apiFetchData);
+    const matchDetails = getMatchDetailsFromFetch(eventid, apiFetchData);
     
     const result = {
       ...rec,

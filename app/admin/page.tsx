@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback } from "react";
 
 type Purchase = {
   id: string;
-  eventId: string;
+  eventid: string;
   buyer: string;
   txid: string;
   amount: number;
@@ -39,14 +39,14 @@ export default function AdminDashboard() {
   const [autoRaffleEnabled, setAutoRaffleEnabled] = useState<boolean>(true);
   const [raffleStatuses, setRaffleStatuses] = useState<Record<string, any>>({});
 
-  const runRaffle = useCallback(async (eventId: string) => {
+  const runRaffle = useCallback(async (eventid: string) => {
     setMessage(null);
     try {
       // Trigger payout so winners receive CARV on-chain
       const res = await fetch("/api/raffle/payout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventId, winnersCount: 1, token: "CARV" }),
+        body: JSON.stringify({ eventid, winnersCount: 1, token: "CARV" }),
       });
       const json = await res.json();
       
@@ -54,14 +54,14 @@ export default function AdminDashboard() {
         // If raffle already exists, update the UI with the existing raffle data
         setRaffleStatuses(prev => ({
           ...prev,
-          [eventId]: json.existing
+          [eventid]: json.existing
         }));
         setMessage("Raffle already completed for this event");
       } else if (json.ok && json.result) {
         // On success, immediately update the UI with the new raffle data
         setRaffleStatuses(prev => ({
           ...prev,
-          [eventId]: json.result
+          [eventid]: json.result
         }));
         setMessage("Raffle completed successfully!");
       } else {
@@ -94,7 +94,7 @@ export default function AdminDashboard() {
   const getPendingEvents = useCallback(() => {
     // Group purchases by event ID
     const grouped = purchases.reduce<Record<string, Purchase[]>>((acc, p) => {
-      const key = String(p.eventId);
+      const key = String(p.eventid);
       acc[key] = acc[key] || [];
       acc[key].push(p);
       return acc;
@@ -111,11 +111,11 @@ export default function AdminDashboard() {
       const pendingEvents = getPendingEvents();
       
       // Only run raffles for events that don't have completed txHash
-      const eventsToRun = pendingEvents.filter(eventId => {
-        const status = raffleStatuses[eventId];
+      const eventsToRun = pendingEvents.filter(eventid => {
+        const status = raffleStatuses[eventid];
         // Skip if raffle already completed (has valid txHash that's not "pending")
         if (status?.txHash && status.txHash !== "pending") {
-          console.log(`[Auto Raffle] Skipping ${eventId} - already completed`);
+          console.log(`[Auto Raffle] Skipping ${eventid} - already completed`);
           return false;
         }
         return true;
@@ -126,9 +126,9 @@ export default function AdminDashboard() {
         return;
       }
       
-      for (const eventId of eventsToRun) {
-        console.log(`[Auto Raffle] Running raffle for ${eventId}`);
-        await runRaffle(eventId);
+      for (const eventid of eventsToRun) {
+        console.log(`[Auto Raffle] Running raffle for ${eventid}`);
+        await runRaffle(eventid);
         await new Promise(resolve => setTimeout(resolve, 1000)); // 1s delay between raffles
       }
       
@@ -155,7 +155,7 @@ export default function AdminDashboard() {
         const raffleJson = await raffleRes.json();
         if (raffleJson.ok && Array.isArray(raffleJson.raffles)) {
           const statusMap = raffleJson.raffles.reduce((acc: Record<string, any>, raffle: any) => {
-            acc[raffle.eventId] = raffle;
+            acc[raffle.eventid] = raffle;
             return acc;
           }, {});
           setRaffleStatuses(statusMap);
@@ -211,10 +211,10 @@ export default function AdminDashboard() {
 
   function exportCSV() {
     if (!purchases.length) return;
-    const header = ["id", "eventId", "buyer", "txid", "amount", "token", "timestamp"];
+    const header = ["id", "eventid", "buyer", "txid", "amount", "token", "timestamp"];
     const rows = purchases.map((p) => [
       p.id,
-      p.eventId,
+      p.eventid,
       p.buyer,
       p.txid,
       String(p.amount),
@@ -241,7 +241,7 @@ export default function AdminDashboard() {
       const res = await fetch('/api/raffle/latest');
       const data = await res.json();
       if (data.ok && data.raffle) {
-        const statusMap = { [data.raffle.eventId]: data.raffle };
+        const statusMap = { [data.raffle.eventid]: data.raffle };
         setRaffleStatuses(statusMap);
       }
     } catch (error) {
@@ -257,7 +257,7 @@ export default function AdminDashboard() {
         const data = await res.json();
         if (data.ok && Array.isArray(data.raffles)) {
           const statusMap = data.raffles.reduce((acc: Record<string, any>, raffle: any) => {
-            acc[raffle.eventId] = raffle;
+            acc[raffle.eventid] = raffle;
             return acc;
           }, {});
           setRaffleStatuses(statusMap);
@@ -271,8 +271,8 @@ export default function AdminDashboard() {
   }, [purchases]); // Reload when purchases change to get updated raffle statuses
 
   // Group purchases by event (for display)
-  const groupedByEvent = getPendingEvents().reduce<Record<string, Purchase[]>>((acc, eventId) => {
-    acc[eventId] = purchases.filter(p => String(p.eventId) === eventId);
+  const groupedByEvent = getPendingEvents().reduce<Record<string, Purchase[]>>((acc, eventid) => {
+    acc[eventid] = purchases.filter(p => String(p.eventid) === eventid);
     return acc;
   }, {});
 

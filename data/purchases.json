@@ -2,7 +2,7 @@
   "purchases": [
     {
       "id": "2357528-13ab632f-96b8-4854-835c-0428249b1eb6",
-      "eventId": "2357528",
+      "eventid": "2357528",
       "buyer": "9g9bDwgrSq8Ssk2wtAtot9bewJhcQXMynUHmR33mFFXe",
       "txid": "5i7xkLGLxFDakP7UWz3G7AQ3gAPTKMwQLaq6WUgL1ipP1Pt9nr56gUnFoSqwn3jaBfvEn56oPBW3AX6SAYf6bxS3",
       "amount": 0.5,
@@ -12,7 +12,7 @@
     },
     {
       "id": "2357529-0c4d1127-f91a-41ef-ac5e-f13e0c3579b1",
-      "eventId": "2357529",
+      "eventid": "2357529",
       "buyer": "9g9bDwgrSq8Ssk2wtAtot9bewJhcQXMynUHmR33mFFXe",
       "txid": "5YaCRD9rmm2QX4KLho5v5DbqcdU8NjUuwn9MhCVSENvv1unqc9xDMFdNVwktuP5w5B6CXg8NCrn7r6rAbKFgr791",
       "amount": 0.5,
@@ -22,7 +22,7 @@
     },
     {
       "id": "2357537-a87ec4d4-b95e-4015-9398-bdd2b97b967f",
-      "eventId": "2357537",
+      "eventid": "2357537",
       "buyer": "9g9bDwgrSq8Ssk2wtAtot9bewJhcQXMynUHmR33mFFXe",
       "txid": "5a74jE4fqffpxH6KH97L8mzLCUcd4W5TSrLRseT29MGGS84dEz1YxDfDVS51LvfgTg3nnZPewczDoHBPkaYCbetY",
       "amount": 0.5,
@@ -32,7 +32,7 @@
     },
     {
       "id": "2357529-478cc8aa-74a4-4385-a4e4-faa11f7d0469",
-      "eventId": "2357529",
+      "eventid": "2357529",
       "buyer": "5RjkrETpWDnn6bmAod9wRMMo2BKjaTGqZevYW5NM8MBA",
       "txid": "3Q9kBp8n1d27oTuUsLYYUyH77AFUNzRa9ZE5usNRAcipNRQRpPWLwMeQd5s6L7DoVh7NddJExCQWHhZJQZofB5QE",
       "amount": 0.5,
@@ -42,7 +42,7 @@
     },
     {
       "id": "2357539-938792ec-db32-43d3-a423-5de12f17e63a",
-      "eventId": "2357539",
+      "eventid": "2357539",
       "buyer": "9g9bDwgrSq8Ssk2wtAtot9bewJhcQXMynUHmR33mFFXe",
       "txid": "2RAJ8CsDH4Qh3CqopbSCfm3sfMHwS2b3VjHGSxs3Uzq7EQ22nh1ayjohfebBkusKkuDTC9SJ3nP8Puxnr3c3V93L",
       "amount": 0.5,
@@ -52,7 +52,7 @@
     },
     {
       "id": "2357539-9b989fc6-b985-41d9-bf54-d944e1eb850a",
-      "eventId": "2357539",
+      "eventid": "2357539",
       "buyer": "5RjkrETpWDnn6bmAod9wRMMo2BKjaTGqZevYW5NM8MBA",
       "txid": "4Mb8ci3ZcRAwYu2pA5tfEDWbQieFLTkGAykuRc4YDow6SWxNcxhTJ9L3YuMRNHc1213cm22DUgVERxNa4fD4SrM5",
       "amount": 0.5,
@@ -62,7 +62,7 @@
     },
     {
       "id": "2357540-b4bba0ef-f88d-44ef-af77-ac6b6b65b0c2",
-      "eventId": "2357540",
+      "eventid": "2357540",
       "buyer": "9g9bDwgrSq8Ssk2wtAtot9bewJhcQXMynUHmR33mFFXe",
       "txid": "4yVLxmsbMAzkenoTEav2yoVzmz3BYzpDVGwHzPiPcRiYP3bfJ7haEdrYD4k5WufoKxvcg1sJznr1N67bycRJyNM4",
       "amount": 0.5,
