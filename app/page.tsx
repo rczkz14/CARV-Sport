@@ -272,32 +272,7 @@ function isMatchStarted(ev: RawEvent) {
   return /live|in progress|started|playing|ft|final|finished|ended|closed|match finished/.test(s);
 }
 
-// Team logo mapping - EXACT filenames from /public/images/
-const TEAM_LOGO_MAP: Record<string, string> = {
-  'New York Knicks': 'New-York-Knicks.png',
-  'Orlando Magic': 'Orlando-Magic.png',
-  'Boston Celtics': 'boston-celtics.png',
-  'Memphis Grizzlies': 'memphis-grizzlies.png',
-  'Los Angeles Clippers': 'los-angeles-clippers.png',
-  'Denver Nuggets': 'Denver-Nuggets.png',
-  'Brooklyn Nets': 'Brooklyn-Nets.png',
-  'Toronto Raptors': 'toronto-raptors.png',
-  'Atlanta Hawks': 'Atlanta-Hawks.png',
-  'New Orleans Pelicans': 'new-orleans-pelicans.png',
-  'Philadelphia 76ers': 'Philadelphia-76ers.png',
-  'Phoenix Suns': 'phoenix-suns.png',
-  'Bournemouth': 'Bournemouth.png',
-  'Brentford': 'brentford.png',
-  'Brighton': 'brighton.png',
-  'West Ham United': 'West-Ham-United.png',
-  'Barcelona': 'barcelona.png',
-  'Valencia': 'Valencia.png',
-  'Levante': 'Levante.png',
-};
-
-function getTeamLogo(teamName: string): string | null {
-  return TEAM_LOGO_MAP[teamName] || null;
-}
+import { getTeamLogo } from '@/lib/teamLogoUtils';
 
 export default function Page() {
   const router = useRouter();
@@ -1100,7 +1075,7 @@ export default function Page() {
                   className="flex flex-col items-center gap-3"
                   aria-label="Select EPL"
                 >
-                  <img src="/images/epl-Logo.png" alt="EPL" className="w-36 h-36 object-contain rounded-lg" />
+                  <img src="/images/epl-Logo.png" alt="EPL" className="w-56 h-56 object-contain rounded-lg" />
                   <div className="mt-2 font-semibold">EPL</div>
                 </button>
 
@@ -1249,9 +1224,9 @@ export default function Page() {
                             <div className="flex flex-col gap-2">
                               <div className="flex items-center justify-center gap-6">
                                 <div className="flex flex-col items-center gap-2">
-                                  {getTeamLogo(ev.home) ? (
+                                  {getTeamLogo(ev.home, ev.league) ? (
                                     <img
-                                      src={`/images/${getTeamLogo(ev.home)}`}
+                                      src={getTeamLogo(ev.home, ev.league)}
                                       alt={ev.home}
                                       className="w-24 h-24 object-contain"
                                     />
@@ -1264,9 +1239,9 @@ export default function Page() {
                                 </div>
                                 <div className="font-bold opacity-60 text-xl">VS</div>
                                 <div className="flex flex-col items-center gap-2">
-                                  {getTeamLogo(ev.away) ? (
+                                  {getTeamLogo(ev.away, ev.league) ? (
                                     <img
-                                      src={`/images/${getTeamLogo(ev.away)}`}
+                                      src={getTeamLogo(ev.away, ev.league)}
                                       alt={ev.away}
                                       className="w-24 h-24 object-contain"
                                     />
@@ -1404,8 +1379,8 @@ export default function Page() {
                                     {ev.homeScore !== null && ev.awayScore !== null ? (
                                       <div className="tracking-wider flex items-center gap-2">
                                         <div className="flex items-center gap-2">
-                                          {getTeamLogo(ev.home) && (
-                                            <img src={`/images/${getTeamLogo(ev.home)}`} alt={ev.home} className="w-6 h-6 object-contain" />
+                                          {getTeamLogo(ev.home, ev.league) && (
+                                            <img src={getTeamLogo(ev.home, ev.league)} alt={ev.home} className="w-6 h-6 object-contain" />
                                           )}
                                           <span className="min-w-[120px]">{ev.home}</span>
                                         </div>
@@ -1414,24 +1389,24 @@ export default function Page() {
                                         <span className="font-mono font-bold px-2 py-1 bg-gray-700/30 rounded">{ev.awayScore}</span>
                                         <div className="flex items-center gap-2">
                                           <span className="min-w-[120px]">{ev.away}</span>
-                                          {getTeamLogo(ev.away) && (
-                                            <img src={`/images/${getTeamLogo(ev.away)}`} alt={ev.away} className="w-6 h-6 object-contain" />
+                                          {getTeamLogo(ev.away, ev.league) && (
+                                            <img src={getTeamLogo(ev.away, ev.league)} alt={ev.away} className="w-6 h-6 object-contain" />
                                           )}
                                         </div>
                                       </div>
                                     ) : (
                                       <div className="flex items-center gap-3">
                                         <div className="flex items-center gap-2">
-                                          {getTeamLogo(ev.home) && (
-                                            <img src={`/images/${getTeamLogo(ev.home)}`} alt={ev.home} className="w-6 h-6 object-contain" />
+                                          {getTeamLogo(ev.home, ev.league) && (
+                                            <img src={getTeamLogo(ev.home, ev.league)} alt={ev.home} className="w-6 h-6 object-contain" />
                                           )}
                                           <span>{ev.home}</span>
                                         </div>
                                         <span className="opacity-80">vs</span>
                                         <div className="flex items-center gap-2">
                                           <span>{ev.away}</span>
-                                          {getTeamLogo(ev.away) && (
-                                            <img src={`/images/${getTeamLogo(ev.away)}`} alt={ev.away} className="w-6 h-6 object-contain" />
+                                          {getTeamLogo(ev.away, ev.league) && (
+                                            <img src={getTeamLogo(ev.away, ev.league)} alt={ev.away} className="w-6 h-6 object-contain" />
                                           )}
                                         </div>
                                       </div>

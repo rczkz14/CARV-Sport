@@ -325,22 +325,18 @@ export async function getLockedNBASelection(): Promise<string[] | null> {
       return null;
     }
     
-    // Get the D+1 date range for right now
-    const { dateStringWIB } = getD1DateRangeWIB(new Date());
+    // For now, return the locked selection if it exists and was locked within the last 24 hours
+    // This allows the locked matches to be shown during the current window period
+    const lockedAt = new Date(parsed.lockedAt);
+    const now = new Date();
+    const hoursSinceLocked = (now.getTime() - lockedAt.getTime()) / (1000 * 60 * 60);
     
-    // The locked selection's d1Date should match the current D+1 period's date
-    // d1Date format in file is "MM/DD/YYYY", but dateStringWIB is "YYYY-MM-DD"
-    // Convert locked date to YYYY-MM-DD format for comparison
-    if (parsed.d1Date && typeof parsed.d1Date === 'string') {
-      const [month, day, year] = parsed.d1Date.split('/');
-      const lockedDateFormatted = `${year}-${month}-${day}`;
-      
-      if (lockedDateFormatted === dateStringWIB) {
-        // Locked date matches current D+1 period - selection is still valid!
-        return parsed.matchIds;
-      }
+    if (hoursSinceLocked <= 48) { // Allow locked selection for up to 48 hours
+      console.log(`[NBA Window] Using locked selection from ${hoursSinceLocked.toFixed(1)} hours ago:`, parsed.matchIds);
+      return parsed.matchIds;
     }
     
+    console.log(`[NBA Window] Locked selection too old (${hoursSinceLocked.toFixed(1)} hours), ignoring`);
     return null;
   } catch (error) {
     console.warn('[NBA Window] Error reading locked selection:', error);
