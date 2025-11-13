@@ -96,10 +96,10 @@ function getLocalWindowTimes(league: string): string {
   let wibStart: number, wibEnd: number, label: string;
   
   if (league === "NBA") {
-    // NBA: 13:00 (D) — 04:00 (D+1) WIB
-    wibStart = 13;
-    wibEnd = 28; // 04:00 next day = 28 in 24h range
-    label = "NBA";
+          // NBA: 13:00 (D) — 04:00 (D+1) WIB
+          wibStart = 0;
+          wibEnd = 48; // Always open for testing
+          label = "NBA";
   } else if (league === "EPL" || league === "LaLiga") {
     // Soccer: 01:00 — 16:00 (D) WIB
     wibStart = 1;
