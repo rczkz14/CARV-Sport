@@ -293,7 +293,7 @@ export default function Page() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
   const ITEMS_PER_PAGE = 6;
-  const [matchPredictions, setMatchPredictions] = useState<Record<string, string>>({}); // eventId -> prediction text
+  const [matchPredictions, setMatchPredictions] = useState<Record<string, string>>({}); // eventid -> prediction text
   
   // Raffle functionality moved to /raffle/page.tsx
 
@@ -423,13 +423,13 @@ export default function Page() {
     }
   }, []);
 
-  const fetchBuyerCounts = useCallback(async (eventIds: string[]) => {
+  const fetchBuyerCounts = useCallback(async (eventids: string[]) => {
     try {
       const counts: Record<string, number> = {};
       await Promise.all(
-        eventIds.map(async (id) => {
+        eventids.map(async (id) => {
           try {
-            const res = await fetch(`/api/purchases/count?eventId=${id}`);
+            const res = await fetch(`/api/purchases/count?eventid=${id}`);
             const j = await res.json();
             counts[id] = j.buyerCount ?? 0;
           } catch (e) {
@@ -459,7 +459,7 @@ export default function Page() {
       const j = await res.json();
       const purchases: any[] = Array.isArray(j?.purchases) ? j.purchases : (j?.purchases ?? []);
       const map: Record<string, boolean> = {};
-      for (const p of purchases) { map[String(p.eventId)] = true; }
+      for (const p of purchases) { map[String(p.eventid)] = true; }
       setPurchasedByWallet(map);
     } catch (e) {
       console.warn("updatePurchasedForWallet failed", e);
@@ -467,29 +467,29 @@ export default function Page() {
     }
   }, []);
 
-  const loadPredictionForMatch = useCallback(async (eventId: string) => {
+  const loadPredictionForMatch = useCallback(async (eventid: string) => {
     try {
-      const res = await fetch(`/api/purchases?eventId=${eventId}`);
+      const res = await fetch(`/api/purchases?eventid=${eventid}`);
       const j = await res.json();
       if (Array.isArray(j.purchases) && j.purchases[0]?.prediction) {
         setMatchPredictions(prev => ({
           ...prev,
-          [eventId]: j.purchases[0].prediction
+          [eventid]: j.purchases[0].prediction
         }));
       }
     } catch (e) {
-      console.error("Failed to load prediction for", eventId, e);
+      console.error("Failed to load prediction for", eventid, e);
     }
   }, []);
 
-  const loadPredictionResult = useCallback(async (eventId: string) => {
+  const loadPredictionResult = useCallback(async (eventid: string) => {
     try {
-      const res = await fetch(`/api/raffle?eventId=${eventId}`);
+      const res = await fetch(`/api/raffle?eventid=${eventid}`);
       const j = await res.json();
       if (j.ok && j.raffle) {
         setPredictionResults(prev => ({
           ...prev,
-          [eventId]: {
+          [eventid]: {
             actualWinner: j.raffle.actualWinner,
             isCorrect: j.raffle.isCorrect,
             homeScore: j.raffle.homeScore,
@@ -499,7 +499,7 @@ export default function Page() {
         }));
       }
     } catch (e) {
-      console.error("Failed to load prediction result for", eventId, e);
+      console.error("Failed to load prediction result for", eventid, e);
     }
   }, []);
 
@@ -616,7 +616,7 @@ export default function Page() {
         const respChk = await fetch("/api/purchases");
         const jChk = await respChk.json();
         const purchases: any[] = Array.isArray(jChk?.purchases) ? jChk.purchases : (jChk?.purchases ?? []);
-        const already = purchases.find(p => String(p.eventId) === String(ev.id) && String(p.buyer) === String(walletPubKeyStr));
+        const already = purchases.find(p => String(p.eventid) === String(ev.id) && String(p.buyer) === String(walletPubKeyStr));
         if (already) {
           setPurchasedByWallet(prev => ({ ...prev, [ev.id]: true }));
           alert("You already bought this prediction (server shows existing purchase).");
@@ -680,7 +680,7 @@ export default function Page() {
           const purchaseRes = await fetch("/api/purchases", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ eventId: ev.id, buyer: walletPubKeyStr, txid, amount: CARV_CHARGE, token: "CARV" }),
+            body: JSON.stringify({ eventid: ev.id, buyer: walletPubKeyStr, txid, amount: CARV_CHARGE, token: "CARV" }),
           });
           const purchaseJson = await purchaseRes.json();
           if (!purchaseRes.ok) {
@@ -708,7 +708,7 @@ export default function Page() {
           const purchaseRes = await fetch("/api/purchases", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ eventId: ev.id, buyer: walletPubKeyStr, txid: String(sig), amount: CARV_CHARGE, token: "CARV" }),
+            body: JSON.stringify({ eventid: ev.id, buyer: walletPubKeyStr, txid: String(sig), amount: CARV_CHARGE, token: "CARV" }),
           });
           const purchaseJson = await purchaseRes.json();
           if (!purchaseRes.ok) {
@@ -757,7 +757,7 @@ export default function Page() {
           const purchaseRes = await fetch("/api/purchases", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ eventId: ev.id, buyer: walletPubKeyStr, txid, amount: CARV_CHARGE, token: "CARV" }),
+            body: JSON.stringify({ eventid: ev.id, buyer: walletPubKeyStr, txid, amount: CARV_CHARGE, token: "CARV" }),
           });
           const purchaseJson = await purchaseRes.json();
           if (!purchaseRes.ok) {
@@ -781,7 +781,7 @@ export default function Page() {
           const purchaseRes = await fetch("/api/purchases", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ eventId: ev.id, buyer: walletPubKeyStr, txid, amount: CARV_CHARGE, token: "CARV" }),
+            body: JSON.stringify({ eventid: ev.id, buyer: walletPubKeyStr, txid, amount: CARV_CHARGE, token: "CARV" }),
           });
           const purchaseJson = await purchaseRes.json();
           if (!purchaseRes.ok) {
@@ -822,9 +822,9 @@ export default function Page() {
     if (!publicKey) { alert("Connect wallet first."); return; }
     try {
       const q = new URLSearchParams();
-      q.set("eventId", ev.id);
+      q.set("eventid", ev.id);
       q.set("buyer", publicKey);
-      console.log(`[Debug] Looking for purchase: eventId=${ev.id}, buyer=${publicKey}`);
+      console.log(`[Debug] Looking for purchase: eventid=${ev.id}, buyer=${publicKey}`);
       const res = await fetch(`/api/purchases?${q.toString()}`);
       const j = await res.json();
       console.log(`[Debug] Purchase lookup result:`, j);
@@ -833,7 +833,7 @@ export default function Page() {
       // If not a buyer, allow viewing if match is finished
       if (!found && ev.status && /finished|ft|final/i.test(String(ev.status))) {
         // Get any prediction for this event (not just from this buyer)
-        const res2 = await fetch(`/api/purchases?eventId=${ev.id}`);
+        const res2 = await fetch(`/api/purchases?eventid=${ev.id}`);
         const j2 = await res2.json();
         found = Array.isArray(j2.purchases) && j2.purchases[0];
         if (!found) { alert("No prediction available for this match yet."); return; }
@@ -841,7 +841,7 @@ export default function Page() {
         // Show debugging info before alerting
         console.log(`[Debug] No purchase found. Available purchases for this event:`, 
                    j.purchases || 'none');
-        alert(`Purchase record not found. Match must be finished to view predictions.\n\nDebug: eventId=${ev.id}, buyer=${publicKey}`); 
+        alert(`Purchase record not found. Match must be finished to view predictions.\n\nDebug: eventid=${ev.id}, buyer=${publicKey}`); 
         return; 
       }
       
