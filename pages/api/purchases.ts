@@ -29,12 +29,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   console.log('[API] /api/purchases called', req.method, req.body || req.query);
   try {
     if (req.method === 'GET') {
-    const { eventId, buyer } = req.query;
+    const { eventid, buyer } = req.query;
     let query = supabase.from('purchases').select('*');
-    if (eventId && buyer) {
-      query = query.eq('eventId', eventId).eq('buyer', buyer);
-    } else if (eventId) {
-      query = query.eq('eventId', eventId);
+    if (eventid && buyer) {
+      query = query.eq('eventid', eventid).eq('buyer', buyer);
+    } else if (eventid) {
+      query = query.eq('eventid', eventid);
     } else if (buyer) {
       query = query.eq('buyer', buyer);
     }
@@ -46,21 +46,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
     if (req.method === 'POST') {
-      const { eventId, buyer, txid, amount, token, prediction } = req.body;
-    if (!eventId || !buyer) {
-      return res.status(400).json({ error: 'eventId and buyer required' });
+      const { eventid, buyer, txid, amount, token, prediction } = req.body;
+    if (!eventid || !buyer) {
+      return res.status(400).json({ error: 'eventid and buyer required' });
     }
       const { data: existing, error: existingError } = await supabase
         .from('purchases')
         .select('*')
-        .eq('eventId', eventId)
+        .eq('eventid', eventid)
         .eq('buyer', buyer);
       if (existingError) {
         console.error('[API] Supabase select error:', existingError.message);
         return res.status(500).json({ error: existingError.message });
       }
       if (existing && existing.length > 0) {
-        console.warn('[API] Already purchased:', { eventId, buyer });
+        console.warn('[API] Already purchased:', { eventid, buyer });
         return res.status(409).json({ error: 'Already purchased this event by this wallet' });
       }
     let finalPrediction = prediction;
@@ -69,7 +69,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const origin = req.headers['origin'] || `http://${req.headers['host']}`;
       const matchRes = await fetch(`${origin}/api/matches`);
       const matchData = await matchRes.json();
-      const match = matchData.events?.find((e: any) => String(e.id) === String(eventId));
+            const match = matchData.events?.find((e: any) => String(e.id) === String(eventid));
       if (match) {
         finalPrediction = await generatePrediction(match);
       } else {
@@ -77,7 +77,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
             const rec = {
-          eventId,
+          eventid,
         buyer,
         txid: txid ?? null,
         amount: amount ?? null,
