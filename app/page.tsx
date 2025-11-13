@@ -207,8 +207,11 @@ function normalizePubkey(input: any): string | null {
 function computeWindowStatusPerSport() {
   const now = new Date();
   const hourUtc = now.getUTCHours();
+  const minuteUtc = now.getUTCMinutes();
 
-  const openNBA = hourUtc >= 6 && hourUtc < 21; // 06:00..20:59 UTC
+  // NBA window: 06:00–23:30 UTC
+  const utcMinutes = hourUtc * 60 + minuteUtc;
+  const openNBA = utcMinutes >= 360 && utcMinutes < 1410; // 360 = 6*60, 1410 = 23*60+30
   const openSoccer = hourUtc >= 18 || hourUtc < 9; // 18:00..23:59 OR 00:00..08:59 UTC
 
   // compute next change target (a Date object) — return a JS Date in UTC/local timezone (same epoch)
