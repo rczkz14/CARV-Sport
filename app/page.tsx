@@ -1075,7 +1075,7 @@ export default function Page() {
                   className="flex flex-col items-center gap-3"
                   aria-label="Select EPL"
                 >
-                  <img src="/images/epl-Logo.png" alt="EPL" className="w-56 h-56 object-contain rounded-lg" />
+                  <img src="/images/epl-logo.png" alt="EPL" className="w-56 h-56 object-contain rounded-lg" />
                   <div className="mt-2 font-semibold">EPL</div>
                 </button>
 
