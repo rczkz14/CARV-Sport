@@ -77,7 +77,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
           const rec = {
-        eventId,
+        eventid: eventId,
         buyer,
         txid: txid ?? null,
         amount: amount ?? null,
