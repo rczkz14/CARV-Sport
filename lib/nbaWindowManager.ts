@@ -9,7 +9,7 @@
  * 
  * For Matches Tab:
  * - Show only D+1 matches (next calendar day)
- * - Max 3 matches
+ * - Max 5 matches
  */
 
 /**
@@ -159,8 +159,8 @@ export function filterNBAMatchesToD1(
     [d1Matches[i], d1Matches[j]] = [d1Matches[j], d1Matches[i]];
   }
 
-  // Limit to max 3 matches
-  return d1Matches.slice(0, 3);
+  // Limit to max 5 matches
+  return d1Matches.slice(0, 5);
 }
 
 /**
@@ -316,7 +316,7 @@ export async function lockNBASelection(matchIds: string[]): Promise<void> {
   
   const data = {
     lockedAt: new Date().toISOString(),
-    matchIds: matchIds.slice(0, 3),
+    matchIds: matchIds.slice(0, 5),
     d1Date: d1DateFormatted,
   };
   

@@ -156,14 +156,19 @@ export async function runWorker() {
     console.log('[Worker] [AUTO-PREDICT] Skipping prediction generation (handled by dedicated worker endpoints)');
 
 
-    // Step 5: Update prediction results for finished matches
-    console.log('[Worker] Updating prediction results for finished matches...');
-    try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/predictions/update-results`, {
-        method: 'GET',
-      }).catch(() => null); // Don't fail worker if update fails
-    } catch (error) {
-      console.warn('[Worker] Failed to update results:', error);
+    // Step 5: Update prediction results for finished matches (every 4 hours)
+    const now = new Date();
+    const shouldUpdateResults = now.getUTCHours() % 4 === 0 && now.getUTCMinutes() < 5; // Every 4 hours for 5 minutes
+
+    if (shouldUpdateResults) {
+      console.log('[Worker] Updating prediction results for finished matches...');
+      try {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/predictions/update-results`, {
+          method: 'GET',
+        }).catch(() => null); // Don't fail worker if update fails
+      } catch (error) {
+        console.warn('[Worker] Failed to update results:', error);
+      }
     }
 
     console.log('[Worker] Worker completed successfully');

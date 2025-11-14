@@ -1,0 +1,26 @@
+{
+  "eventId": "2357543",
+  "matchDetails": {
+    "home": "Detroit Pistons",
+    "away": "Philadelphia 76ers",
+    "league": "NBA",
+    "datetime": "2025-11-15T00:30:00+00:00",
+    "venue": "Little Caesars Arena"
+  },
+  "prediction": {
+    "predictedScore": "103-121",
+    "totalScore": 224,
+    "predictedWinner": "Philadelphia 76ers",
+    "confidence": 70,
+    "review": "Philadelphia 76ers dismantles Detroit Pistons in convincing fashion. Nothing goes right for Detroit Pistons early as Philadelphia 76ers builds an insurmountable lead. By halftime, the outcome is already decided. Detroit Pistons's help defense creates driving lanes on the wings. Philadelphia 76ers's pace dictates tempo and wears out opposing defenses. Aggressive full-court pressing in the final quarter forces errors. Detroit Pistons's depth scoring from multiple positions neutralizes defensive schemes.",
+    "generatedAt": "2025-11-14T07:22:25.534Z"
+  },
+  "predictionText": "Prediction\n\n🏀 Detroit Pistons vs Philadelphia 76ers\nPredicted Score: 103-121\nTotal Score: 224\nPredicted Winner: Philadelphia 76ers\nConfidence: 70%\n\nReview:\nPhiladelphia 76ers dismantles Detroit Pistons in convincing fashion. Nothing goes right for Detroit Pistons early as Philadelphia 76ers builds an insurmountable lead. By halftime, the outcome is already decided. Detroit Pistons's help defense creates driving lanes on the wings. Philadelphia 76ers's pace dictates tempo and wears out opposing defenses. Aggressive full-court pressing in the final quarter forces errors. Detroit Pistons's depth scoring from multiple positions neutralizes defensive schemes.\n\nGenerated: 2025-11-14T07:22:25.534Z",
+  "actualWinner": null,
+  "actualResult": null,
+  "isCorrect": null,
+  "homeScore": null,
+  "awayScore": null,
+  "status": null,
+  "createdAt": "2025-11-14T07:22:25.534Z"
+}

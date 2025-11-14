@@ -10,9 +10,11 @@
  */
 
 import { NextResponse } from "next/server";
-import { isAutoPredictTime, getNBAWindowStatus, getLockedNBASelection } from "@/lib/nbaWindowManager";
-import { generatePredictionsForMatches } from "@/lib/predictionGenerator";
+
+import { isAutoPredictTime, getNBAWindowStatus, getLockedNBASelection, getD1DateRangeWIB } from "@/lib/nbaWindowManager";
+import { generatePredictionsForMatches, getPredictionForMatch } from "@/lib/predictionGenerator";
 import { fetchLiveMatchData } from "@/lib/sportsFetcher";
+import { supabase } from "@/lib/supabaseClient";
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -50,61 +52,72 @@ export async function GET(req: Request) {
       console.log('[Auto-Predict] Proceeding anyway (manual trigger allowed)');
     }
 
-    // 1. Get locked selection from auto-select worker
-    const lockedIds = await getLockedNBASelection();
-    
+    // 1. Get locked selection from Supabase (primary) or fallback to local file
+    let lockedIds: string[] = [];
+
+    // Try Supabase first
+    const { data: lockedSelection, error: lockError } = await supabase
+      .from('nba_locked_selections')
+      .select('match_ids')
+      .eq('d1_date', getD1DateRangeWIB(nowUtc).dateStringWIB)
+      .single();
+
+    if (!lockError && lockedSelection?.match_ids && Array.isArray(lockedSelection.match_ids)) {
+      lockedIds = lockedSelection.match_ids;
+      console.log('[Auto-Predict] Found locked selection in Supabase:', lockedIds);
+    } else {
+      console.log('[Auto-Predict] No locked selection in Supabase, trying local file...');
+      // Fallback to local file
+      lockedIds = await getLockedNBASelection() || [];
+    }
+
     if (!lockedIds || lockedIds.length === 0) {
-      console.log('[Auto-Predict] No locked selection found. Was auto-select-nba called at 11:00 WIB?');
-      return NextResponse.json({
-        ok: false,
-        message: "No locked match selection found. Auto-select should have run at 11:00 WIB",
-        generatedCount: 0
-      }, { status: 400 });
+      console.log('[Auto-Predict] No locked selection found anywhere. Falling back to all nba_matches_pending.');
+
+      // Fallback: Get all event_ids from nba_matches_pending
+      const { data: pendingMatches, error } = await supabase
+        .from('nba_matches_pending')
+        .select('event_id');
+      if (error) {
+        console.error('[Auto-Predict] Error fetching pending matches:', error.message);
+        return NextResponse.json({
+          ok: false,
+          message: "No locked selection and failed to fetch pending matches",
+          generatedCount: 0
+        }, { status: 500 });
+      }
+      lockedIds = pendingMatches?.map(m => m.event_id) || [];
+      console.log('[Auto-Predict] Fallback lockedIds:', lockedIds);
+      if (lockedIds.length === 0) {
+        return NextResponse.json({
+          ok: false,
+          message: "No matches found in nba_matches_pending",
+          generatedCount: 0
+        }, { status: 400 });
+      }
     }
 
     console.log(`[Auto-Predict] Found locked selection: ${lockedIds.join(', ')}`);
 
-    // 2. Fetch current cache to get match details
-    const cachedData = await readCache();
-    if (!cachedData) {
-      return NextResponse.json({ ok: false, error: "Cache not available" }, { status: 503 });
+    // 2. Get match details from nba_matches_pending
+    const { data: allPendingMatches, error: fetchError } = await supabase
+      .from('nba_matches_pending')
+      .select('*');
+    if (fetchError) {
+      console.error('[Auto-Predict] Error fetching all match details from Supabase:', fetchError.message);
+      return NextResponse.json({ ok: false, error: "Failed to fetch match details" }, { status: 500 });
     }
+    const pendingMatches = allPendingMatches?.filter(m => lockedIds.includes(m.event_id)) || [];
 
-    // Get details for locked match IDs
-    let nbaMatches: any[] = [];
-    try {
-      const byId = new Map<string, any>();
-      
-      if (cachedData.nba?.league && Array.isArray(cachedData.nba.league)) {
-        cachedData.nba.league.forEach((m: any) => {
-          if (m.idEvent) byId.set(String(m.idEvent), m);
-        });
-      }
-      
-      if (cachedData.nba?.daily && Array.isArray(cachedData.nba.daily)) {
-        cachedData.nba.daily.forEach((m: any) => {
-          if (m.idEvent) byId.set(String(m.idEvent), m);
-        });
-      }
-      
-      // Only keep locked matches
-      const lockedSet = new Set(lockedIds);
-      for (const [id, match] of byId) {
-        if (lockedSet.has(id)) {
-          nbaMatches.push(match);
-        }
-      }
-      
-      console.log(`[Auto-Predict] Found ${nbaMatches.length} locked matches in cache`);
-    } catch (e) {
-      console.warn('[Auto-Predict] Error reading NBA cache:', e);
-    }
+    let nbaMatches: any[] = pendingMatches || [];
+    console.log(`[Auto-Predict] Found ${nbaMatches.length} matches in nba_matches_pending for IDs:`, lockedIds);
+    console.log('[Auto-Predict] Pending matches:', pendingMatches);
 
     if (nbaMatches.length === 0) {
-      console.log('[Auto-Predict] No matches found for locked IDs:', lockedIds.join(', '));
+      console.log('[Auto-Predict] No matches found for IDs:', lockedIds.join(', '));
       return NextResponse.json({
         ok: false,
-        message: "Locked matches not found in cache",
+        message: "No matches found for the selected IDs",
         generatedCount: 0
       }, { status: 404 });
     }
@@ -127,14 +140,14 @@ export async function GET(req: Request) {
 
     // 4. Generate predictions for matches that don't have any yet
     const matchesToPredict = nbaMatches
-      .filter((m: any) => !existingPredictions.has(String(m.idEvent)))
+      .filter((m: any) => !existingPredictions.has(String(m.event_id)))
       .map((m: any) => ({
-        id: m.idEvent,
-        home: m.strHomeTeam,
-        away: m.strAwayTeam,
+        id: m.event_id,
+        home: m.home_team,
+        away: m.away_team,
         league: "NBA",
-        datetime: m.strTimestamp || (m.dateEvent && m.strTime ? `${m.dateEvent}T${m.strTime}Z` : null),
-        venue: m.strVenue,
+        datetime: m.event_date,
+        venue: m.venue,
       }));
 
     if (matchesToPredict.length === 0) {
@@ -145,20 +158,55 @@ export async function GET(req: Request) {
         timestamp: nowUtc.toISOString(),
         generatedCount: 0,
         matchCount: nbaMatches.length,
-        matches: nbaMatches.map((m: any) => `${m.strHomeTeam} vs ${m.strAwayTeam}`),
+        matches: nbaMatches.map((m: any) => `${m.home_team} vs ${m.away_team}`),
       });
     }
 
     console.log(`[Auto-Predict] Generating predictions for ${matchesToPredict.length} matches:`,
       matchesToPredict.map((m: any) => `${m.home} vs ${m.away}`));
 
+
     const generatedCount = await generatePredictionsForMatches(matchesToPredict, { bypassLeagueCheck: true });
 
-    console.log(`[Auto-Predict] ✅ Successfully generated ${generatedCount} predictions`);
+    // Store predictions in Supabase
+    for (const match of matchesToPredict) {
+      console.log(`[Auto-Predict] Processing match ${match.id}: ${match.home} vs ${match.away}`);
+      try {
+        const prediction = await getPredictionForMatch(match.id);
+        console.log(`[Auto-Predict] Got prediction for ${match.id}:`, prediction ? 'yes' : 'no');
+        if (prediction && prediction.prediction) {
+          const { predictedWinner, generatedAt } = prediction.prediction;
+          const { id } = match;
+          const { status } = prediction;
+          const upsertData = {
+            event_id: id,
+            prediction_winner: predictedWinner,
+            prediction_time: generatedAt,
+            status: status || 'pending',
+            prediction_text: prediction.predictionText,
+            created_at: new Date().toISOString(),
+          };
+          console.log(`[Auto-Predict] Upserting to nba_predictions:`, upsertData);
+          const { data, error } = await supabase.from('nba_predictions').upsert([upsertData], { onConflict: 'event_id' });
+          console.log(`[Auto-Predict] Upsert result for ${match.id}:`, { data, error });
+          if (!error) {
+            console.log(`[Auto-Predict] Successfully saved prediction for match ${match.id}`);
+          } else {
+            console.warn(`[Auto-Predict] Upsert error for ${match.id}:`, error.message);
+          }
+        } else {
+          console.warn(`[Auto-Predict] No prediction data for match ${match.id}`);
+        }
+      } catch (e) {
+        console.warn(`[Auto-Predict] Error saving prediction for match ${match.id} to Supabase:`, e);
+      }
+    }
+
+    console.log(`[Auto-Predict] ✅ Successfully generated ${generatedCount} predictions and stored in Supabase`);
 
     return NextResponse.json({
       ok: true,
-      message: `Generated ${generatedCount} predictions for locked NBA matches`,
+      message: `Generated ${generatedCount} predictions for locked NBA matches and stored in Supabase`,
       timestamp: nowUtc.toISOString(),
       generatedCount,
       matchCount: matchesToPredict.length,

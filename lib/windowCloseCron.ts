@@ -10,6 +10,7 @@
 import { CronJob } from 'cron';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { createClient } from '@supabase/supabase-js';
 
 const CACHE_FILE = path.join(process.cwd(), 'data/api_fetch.json');
 const NBA_LOCKED_FILE = path.join(process.cwd(), 'data/nba_locked_selection.json');
@@ -33,6 +34,100 @@ async function archiveLeagueMatches(
 ): Promise<void> {
   try {
     console.log(`[${new Date().toISOString()}] [Window Close] Starting ${league} archival...`);
+
+    if (league === 'NBA') {
+      // For NBA, archive from Supabase nba_matches_pending to nba_matches_history
+      await archiveNBAMatchesFromSupabase();
+    } else {
+      // For EPL/LaLiga, use the old method with local files
+      await archiveLeagueMatchesFromFiles(league, lockedFile, historyFile);
+    }
+  } catch (error: any) {
+    console.error(`[Window Close] ${league} error:`, error?.message || error);
+  }
+}
+
+/**
+ * Archive NBA matches from Supabase (nba_matches_pending → nba_matches_history)
+ */
+async function archiveNBAMatchesFromSupabase(): Promise<void> {
+  try {
+    console.log(`[${new Date().toISOString()}] [Window Close] Archiving NBA matches from Supabase...`);
+
+    // Initialize Supabase client
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
+
+    // Get all pending NBA matches
+    const { data: pendingMatches, error: fetchError } = await supabase
+      .from('nba_matches_pending')
+      .select('*');
+
+    if (fetchError) {
+      console.error('[Window Close] Error fetching NBA matches from Supabase:', fetchError.message);
+      return;
+    }
+
+    if (!pendingMatches || pendingMatches.length === 0) {
+      console.log('[Window Close] No NBA matches in pending table');
+      return;
+    }
+
+    console.log(`[Window Close] Found ${pendingMatches.length} NBA matches to archive`);
+
+    // Prepare history entries
+    const historyEntries = pendingMatches.map(match => ({
+      id: match.id,
+      event_id: match.event_id,
+      home_team: match.home_team,
+      away_team: match.away_team,
+      event_date: match.event_date,
+      venue: match.venue || null,
+      status: 'waiting for result',
+      created_at: match.created_at,
+      home_score: match.home_score || null,
+      away_score: match.away_score || null,
+    }));
+
+    // Insert into history table
+    const { error: insertError } = await supabase
+      .from('nba_matches_history')
+      .upsert(historyEntries, { onConflict: 'event_id' });
+
+    if (insertError) {
+      console.error('[Window Close] Error inserting NBA matches to history:', insertError.message);
+      return;
+    }
+
+    // Delete from pending table
+    const eventIds = pendingMatches.map(m => m.event_id);
+    const { error: deleteError } = await supabase
+      .from('nba_matches_pending')
+      .delete()
+      .in('event_id', eventIds);
+
+    if (deleteError) {
+      console.error('[Window Close] Error deleting NBA matches from pending:', deleteError.message);
+      return;
+    }
+
+    console.log(`[${new Date().toISOString()}] [Window Close] ✓ Archived ${pendingMatches.length} NBA matches from Supabase`);
+  } catch (error: any) {
+    console.error(`[Window Close] NBA Supabase archival error:`, error?.message || error);
+  }
+}
+
+/**
+ * Archive matches for EPL/LaLiga from local files (legacy method)
+ */
+async function archiveLeagueMatchesFromFiles(
+  league: 'EPL' | 'LaLiga',
+  lockedFile: string,
+  historyFile: string
+): Promise<void> {
+  try {
+    console.log(`[${new Date().toISOString()}] [Window Close] Starting ${league} archival from files...`);
 
     // Read locked matches
     let lockedMatches: string[] = [];
@@ -63,7 +158,7 @@ async function archiveLeagueMatches(
     // Get full match details
     let fullMatches: any[] = [];
     const leagueKey = league.toLowerCase();
-    
+
     if (cache[leagueKey]?.league && Array.isArray(cache[leagueKey].league)) {
       for (const match of cache[leagueKey].league) {
         if (lockedMatches.includes(String(match.idEvent))) {
@@ -71,7 +166,7 @@ async function archiveLeagueMatches(
         }
       }
     }
-    
+
     if (cache[leagueKey]?.daily && Array.isArray(cache[leagueKey].daily)) {
       for (const match of cache[leagueKey].daily) {
         if (lockedMatches.includes(String(match.idEvent)) && !fullMatches.find((m: any) => m.idEvent === match.idEvent)) {

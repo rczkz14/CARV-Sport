@@ -1,0 +1,26 @@
+{
+  "eventId": "2357541",
+  "matchDetails": {
+    "home": "New York Knicks",
+    "away": "Miami Heat",
+    "league": "NBA",
+    "datetime": "2025-11-15T00:00:00+00:00",
+    "venue": "Madison Square Garden"
+  },
+  "prediction": {
+    "predictedScore": "120-103",
+    "totalScore": 223,
+    "predictedWinner": "New York Knicks",
+    "confidence": 68,
+    "review": "New York Knicks's offense moves with such fluidity that Miami Heat's defense looks pedestrian. Easy scoring comes from every position on the floor. Miami Heat's interior defense cannot contain the opposing center. New York Knicks's pace dictates tempo and wears out opposing defenses. Miami Heat forces a turnover in the final possession to secure victory. Miami Heat's young reserves make costly mistakes in high-leverage moments.",
+    "generatedAt": "2025-11-14T07:22:25.505Z"
+  },
+  "predictionText": "Prediction\n\n🏀 New York Knicks vs Miami Heat\nPredicted Score: 120-103\nTotal Score: 223\nPredicted Winner: New York Knicks\nConfidence: 68%\n\nReview:\nNew York Knicks's offense moves with such fluidity that Miami Heat's defense looks pedestrian. Easy scoring comes from every position on the floor. Miami Heat's interior defense cannot contain the opposing center. New York Knicks's pace dictates tempo and wears out opposing defenses. Miami Heat forces a turnover in the final possession to secure victory. Miami Heat's young reserves make costly mistakes in high-leverage moments.\n\nGenerated: 2025-11-14T07:22:25.505Z",
+  "actualWinner": null,
+  "actualResult": null,
+  "isCorrect": null,
+  "homeScore": null,
+  "awayScore": null,
+  "status": null,
+  "createdAt": "2025-11-14T07:22:25.505Z"
+}

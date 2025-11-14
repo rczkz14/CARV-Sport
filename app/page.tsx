@@ -35,7 +35,7 @@ const MAX_PER_SPORT = 2;
 // token config
 const CARV_MINT_STR = "D7WVEw9Pkf4dfCCE3fwGikRCCTvm9ipqTYPHRENLiw3s";
 const CARV_DECIMALS = 9;
-const CARV_CHARGE = 0.5; // 0.5 CARV
+const CARV_CHARGE = 1.0; // 1 CARV
 
 // env / fallback
 const RPC_URL = (process.env.NEXT_PUBLIC_CARV_RPC as string) || "https://rpc.testnet.carv.io/rpc";
@@ -96,10 +96,10 @@ function getLocalWindowTimes(league: string): string {
   let wibStart: number, wibEnd: number, label: string;
   
   if (league === "NBA") {
-          // NBA: 13:00 (D) — 04:00 (D+1) WIB
-          wibStart = 0;
-          wibEnd = 48; // Always open for testing
-          label = "NBA";
+    // NBA: 13:00 (D) — 04:00 (D+1) WIB
+    wibStart = 13;
+    wibEnd = 28; // 04:00 WIB next day = 28th hour from midnight
+    label = "NBA";
   } else if (league === "EPL" || league === "LaLiga") {
     // Soccer: 01:00 — 16:00 (D) WIB
     wibStart = 1;
@@ -115,9 +115,9 @@ function getLocalWindowTimes(league: string): string {
   // Create WIB time (UTC+7) and convert to user's local timezone
   const wibStartDate = new Date(today.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
   wibStartDate.setHours(wibStart, 0, 0, 0);
-  
+
   const wibEndDate = new Date(today.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
-  if (wibEnd >= 24) {
+  if (wibEnd > 23) {
     wibEndDate.setDate(wibEndDate.getDate() + 1);
     wibEndDate.setHours(wibEnd - 24, 0, 0, 0);
   } else {
@@ -280,6 +280,7 @@ import { getTeamLogo } from '@/lib/teamLogoUtils';
 export default function Page() {
   const router = useRouter();
   const [darkMode, setDarkMode] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
   const [events, setEvents] = useState<RawEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [publicKey, setPublicKey] = useState<string | null>(null);
@@ -327,14 +328,26 @@ export default function Page() {
     setIsMounted(true);
     // Initialize background worker
     fetch('/api/init').catch(e => console.warn('Worker init failed:', e));
-    
+
     // Update local time on client only
     setCurrentLocalTime(new Date().toLocaleString());
     const timeInterval = setInterval(() => {
       setCurrentLocalTime(new Date().toLocaleString());
     }, 1000);
-    
-    return () => clearInterval(timeInterval);
+
+    // Check if mobile in portrait
+    const checkMobile = () => {
+      const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const isPortrait = window.innerHeight > window.innerWidth;
+      setIsMobile(isMobileDevice && isPortrait);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+
+    return () => {
+      clearInterval(timeInterval);
+      window.removeEventListener('resize', checkMobile);
+    };
   }, []);
 
   useEffect(() => {
@@ -517,11 +530,13 @@ export default function Page() {
 
   useEffect(() => {
     // Fetch matches when showHistory changes
-    fetchMatches({ history: showHistory });
-    // Only refresh history view every 3 hours for final scores
     if (showHistory) {
+      fetchMatches({ history: true });
+      // Only refresh history view every 3 hours for final scores
       const id = setInterval(() => fetchMatches({ history: true }), 3 * 60 * 60 * 1000);
       return () => clearInterval(id);
+    } else {
+      fetchMatches();
     }
   }, [fetchMatches, showHistory]);
 
@@ -905,8 +920,21 @@ export default function Page() {
     fetchMatches({ history: false });
   };
 
+  if (isMobile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
+        <div className="text-center p-8">
+          <img src="/images/rotate.gif" alt="Rotate Device" className="w-32 h-32 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold mb-4">Rotate Your Device</h1>
+          <p className="text-gray-400">This website requires landscape orientation on mobile devices.</p>
+          <p className="text-gray-400 mt-2">Please rotate your phone to continue.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div 
+    <div
       className={`${darkMode ? "text-white" : "text-gray-900"} min-h-screen transition-colors relative overflow-hidden`}
       style={{ backgroundColor: darkMode ? '#111827' : '#ffffff' }}
     >
@@ -1213,7 +1241,7 @@ export default function Page() {
                     if (leagueFilter === "LaLiga") return /laliga|la liga/i.test(ev.league ?? "") || /spanish|la\s+liga/i.test(ev.league ?? "");
                     return true;
                   })
-                  // exclude started/closed matches
+                  // Show matches if not started, regardless of window status
                   .filter(ev => !isMatchStarted(ev))
                   // Sort by datetime (earliest first)
                   .sort((a, b) => {
@@ -1236,7 +1264,7 @@ export default function Page() {
                             <span className="text-xs text-gray-500">Event #{ev.id}</span>
                           </div>
                           <div className="flex items-center gap-1">
-                            <span className="text-sm font-bold">0.5 $CARV</span>
+                            <span className="text-sm font-bold">{CARV_CHARGE} $CARV</span>
                             <img src="/images/carv-token.png" alt="CARV" className="w-4 h-4 object-contain" />
                           </div>
                         </div>
@@ -1304,8 +1332,14 @@ export default function Page() {
                                 >
                                   {busy ? "Processing…" : (ev.buyable ? "Buy Prediction" : "Not available")}
                                 </button>
-                                {!ev.buyable && ev.buyableFrom && (
-                                  <div className="text-xs opacity-60 mt-1">Available from {new Date(ev.buyableFrom).toLocaleString()}</div>
+                                {!ev.buyable && (
+                                  <div className="text-xs opacity-60 mt-1">
+                                    {ev.buyableFrom ? (
+                                      <>Available from {new Date(ev.buyableFrom).toLocaleString()}</>
+                                    ) : (
+                                      <>Predictions can be purchased up to 24 hours before match start</>
+                                    )}
+                                  </div>
                                 )}
                               </>
                             )}
@@ -1356,7 +1390,11 @@ export default function Page() {
                     if (leagueFilter === "LaLiga") return /laliga|la liga/i.test(ev.league ?? "") || /spanish|la\s+liga/i.test(ev.league ?? "");
                     return true;
                   })
+                  // Show matches in history if match is started or finished
                   .filter(ev => {
+                    const isStarted = isMatchStarted(ev);
+                    const isFinished = ev.status && /finished|final|ft/i.test(ev.status);
+                    if (!isStarted && !isFinished) return false;
                     const query = searchQuery.toLowerCase();
                     return (
                       ev.id.toLowerCase().includes(query) ||

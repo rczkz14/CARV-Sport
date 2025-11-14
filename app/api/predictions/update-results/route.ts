@@ -10,6 +10,7 @@ import { getMatchResultsBatch } from "@/lib/footballDataAPI";
 import { getNBAMatchResultsBatch } from "@/lib/nbaScoresAPI";
 import { promises as fs } from 'fs';
 import path from 'path';
+import { createClient } from '@supabase/supabase-js';
 
 const CACHE_FILE = path.join(process.cwd(), 'data/api_fetch.json');
 
@@ -84,46 +85,76 @@ async function updatePredictionResult(eventId: string, finalMatch: any): Promise
 
 export async function GET() {
   try {
-    console.log('[UpdateResults] Starting prediction result update...');
+    console.log('[UpdateResults] Starting match result update...');
 
-    // Get all raffle files that need updating
-    const dataDir = path.join(process.cwd(), 'data');
-    const files = await fs.readdir(dataDir);
-    const raffleFiles = files.filter(f => f.startsWith('raffle-') && f.endsWith('.json'));
+    // Initialize Supabase client
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
 
-    // Collect all unfinished predictions, separated by league
-    const nbaMatches: Array<{ eventId: string; homeTeam: string; awayTeam: string }> = [];
-    const soccerMatches: Array<{ eventId: string; homeTeam: string; awayTeam: string }> = [];
-    
-    for (const file of raffleFiles) {
-      const eventId = file.replace('raffle-', '').replace('.json', '');
-      try {
-        const raffleFile = path.join(dataDir, file);
-        const data = await fs.readFile(raffleFile, 'utf-8');
-        const prediction = JSON.parse(data);
+    // Get all NBA matches from history that need result updates
+    const { data: nbaHistoryMatches, error: nbaError } = await supabase
+      .from('nba_matches_history')
+      .select('*')
+      .eq('status', 'waiting for result');
 
-        // Only process if not already updated
-        if (prediction.actualWinner === null && prediction.isCorrect === null) {
-          const item = {
-            eventId,
-            homeTeam: prediction.matchDetails?.home || prediction.homeTeam || '',
-            awayTeam: prediction.matchDetails?.away || prediction.awayTeam || '',
-          };
-
-          // Separate by league
-          if (prediction.matchDetails?.league?.toUpperCase() === 'NBA') {
-            nbaMatches.push(item);
-          } else {
-            soccerMatches.push(item);
-          }
-        }
-      } catch (e) {
-        // Skip if can't read
-      }
+    if (nbaError) {
+      console.error('[UpdateResults] Error fetching NBA history matches:', nbaError.message);
+      return NextResponse.json({ ok: false, error: 'Failed to fetch NBA matches' }, { status: 500 });
     }
 
+    // Get all soccer matches from local history files that need updates
+    const soccerMatches: Array<{ eventId: string; homeTeam: string; awayTeam: string; league: string }> = [];
+
+    // Check EPL history
+    try {
+      const eplHistoryPath = path.join(process.cwd(), 'data/epl_history.json');
+      const eplData = JSON.parse(await fs.readFile(eplHistoryPath, 'utf-8'));
+      if (eplData.matches) {
+        for (const match of eplData.matches) {
+          if (match.status === 'waiting for result' || !match.status || match.status === 'TBD') {
+            soccerMatches.push({
+              eventId: match.id,
+              homeTeam: match.home,
+              awayTeam: match.away,
+              league: 'EPL'
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[UpdateResults] Could not read EPL history');
+    }
+
+    // Check LaLiga history
+    try {
+      const laligaHistoryPath = path.join(process.cwd(), 'data/laliga_history.json');
+      const laligaData = JSON.parse(await fs.readFile(laligaHistoryPath, 'utf-8'));
+      if (laligaData.matches) {
+        for (const match of laligaData.matches) {
+          if (match.status === 'waiting for result' || !match.status || match.status === 'TBD') {
+            soccerMatches.push({
+              eventId: match.id,
+              homeTeam: match.home,
+              awayTeam: match.away,
+              league: 'LaLiga'
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[UpdateResults] Could not read LaLiga history');
+    }
+
+    const nbaMatches = nbaHistoryMatches?.map(match => ({
+      eventId: match.event_id,
+      homeTeam: match.home_team,
+      awayTeam: match.away_team,
+      league: 'NBA'
+    })) || [];
+
     if (nbaMatches.length === 0 && soccerMatches.length === 0) {
-      console.log('[UpdateResults] No predictions to update');
+      console.log('[UpdateResults] No matches to update');
       return NextResponse.json({ ok: true, updated: 0 });
     }
 
@@ -162,24 +193,74 @@ export async function GET() {
       }
     }
 
-    // Update predictions with results
+    // Update matches with results
     let updated = 0;
-    const allToUpdate = [...nbaMatches, ...soccerMatches];
-    
-    for (const item of allToUpdate) {
+
+    // Update NBA matches in Supabase
+    for (const item of nbaMatches) {
       const result = allResults.get(item.eventId);
       if (result && result.homeScore !== null && result.awayScore !== null) {
-        const wasUpdated = await updatePredictionResult(item.eventId, {
-          home: item.homeTeam,
-          away: item.awayTeam,
-          homeScore: result.homeScore,
-          awayScore: result.awayScore,
-        });
-        if (wasUpdated) updated++;
+        const { error: updateError } = await supabase
+          .from('nba_matches_history')
+          .update({
+            home_score: result.homeScore,
+            away_score: result.awayScore,
+            status: 'FT'
+          })
+          .eq('event_id', item.eventId);
+
+        if (!updateError) {
+          console.log(`[UpdateResults] Updated NBA match ${item.eventId}: ${item.homeTeam} ${result.homeScore}-${result.awayScore} ${item.awayTeam}`);
+          updated++;
+
+          // Also update local raffle file if it exists
+          await updatePredictionResult(item.eventId, {
+            home: item.homeTeam,
+            away: item.awayTeam,
+            homeScore: result.homeScore,
+            awayScore: result.awayScore,
+          });
+        } else {
+          console.error(`[UpdateResults] Failed to update NBA match ${item.eventId}:`, updateError.message);
+        }
       }
     }
 
-    console.log(`[UpdateResults] Updated ${updated} predictions`);
+    // Update soccer matches in local files
+    for (const item of soccerMatches) {
+      const result = allResults.get(item.eventId);
+      if (result && result.homeScore !== null && result.awayScore !== null) {
+        const historyFile = item.league === 'EPL' ? 'data/epl_history.json' : 'data/laliga_history.json';
+        try {
+          const historyPath = path.join(process.cwd(), historyFile);
+          const historyData = JSON.parse(await fs.readFile(historyPath, 'utf-8'));
+
+          // Find and update the match
+          const matchIndex = historyData.matches.findIndex((m: any) => String(m.id) === String(item.eventId));
+          if (matchIndex !== -1) {
+            historyData.matches[matchIndex].homeScore = result.homeScore;
+            historyData.matches[matchIndex].awayScore = result.awayScore;
+            historyData.matches[matchIndex].status = 'FT';
+
+            await fs.writeFile(historyPath, JSON.stringify(historyData, null, 2), 'utf-8');
+            console.log(`[UpdateResults] Updated ${item.league} match ${item.eventId}: ${item.homeTeam} ${result.homeScore}-${result.awayScore} ${item.awayTeam}`);
+            updated++;
+
+            // Also update local raffle file if it exists
+            await updatePredictionResult(item.eventId, {
+              home: item.homeTeam,
+              away: item.awayTeam,
+              homeScore: result.homeScore,
+              awayScore: result.awayScore,
+            });
+          }
+        } catch (e) {
+          console.error(`[UpdateResults] Failed to update ${item.league} match ${item.eventId}:`, e);
+        }
+      }
+    }
+
+    console.log(`[UpdateResults] Updated ${updated} matches with final results`);
     return NextResponse.json({ ok: true, updated });
   } catch (error: any) {
     console.error('[UpdateResults] Error:', error);
