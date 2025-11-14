@@ -293,7 +293,7 @@ export default function Page() {
   const [showHistory, setShowHistory] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const ITEMS_PER_PAGE = 6;
+  const ITEMS_PER_PAGE = 5;
   const [matchPredictions, setMatchPredictions] = useState<Record<string, string>>({}); // eventid -> prediction text
   
   // Raffle functionality moved to /raffle/page.tsx
@@ -337,16 +337,33 @@ export default function Page() {
 
     // Check if mobile in portrait
     const checkMobile = () => {
-      const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      const isPortrait = window.innerHeight > window.innerWidth;
+      const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera || '';
+      const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent) ||
+                            (/Macintosh/i.test(userAgent) && 'ontouchend' in document); // iPad detection
+
+      // Check orientation - prefer screen.orientation API if available
+      let isPortrait = false;
+      if (screen && screen.orientation) {
+        isPortrait = screen.orientation.type.includes('portrait');
+      } else if (window.orientation !== undefined) {
+        // Fallback for older browsers
+        isPortrait = Math.abs(window.orientation as number) === 90 ? false : true;
+      } else {
+        // Fallback to dimensions
+        isPortrait = window.innerHeight > window.innerWidth;
+      }
+
       setIsMobile(isMobileDevice && isPortrait);
     };
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
+    window.addEventListener('orientationchange', checkMobile);
 
     return () => {
       clearInterval(timeInterval);
       window.removeEventListener('resize', checkMobile);
+      window.removeEventListener('orientationchange', checkMobile);
     };
   }, []);
 

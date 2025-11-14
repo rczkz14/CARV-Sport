@@ -228,9 +228,15 @@ export async function GET(req: Request) {
       const table = isHistory ? 'nba_matches_history' : 'nba_matches_pending';
 
       // Fetch NBA matches from the appropriate table
-      const { data, error } = await supabase
-        .from(table)
-        .select('*');
+      let query = supabase.from(table).select('*');
+
+      // For history, only return matches that are actually finished, have results, or are waiting for results
+      if (isHistory) {
+        // Filter for finished matches, matches with scores, or matches waiting for results
+        query = query.or('status.ilike.%finished%,status.ilike.%final%,status.ilike.%ft%,status.ilike.%completed%,status.ilike.%FT%,status.ilike.%Waiting for Result%').or('home_score.not.is.null,away_score.not.is.null');
+      }
+
+      const { data, error } = await query;
       if (error) {
         console.warn(`Supabase error fetching NBA matches from ${table}:`, error.message);
       } else if (Array.isArray(data)) {
