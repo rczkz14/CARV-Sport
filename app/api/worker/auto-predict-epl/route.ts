@@ -1,18 +1,20 @@
 /**
  * Auto-Predict EPL Worker
- * Triggers at 12:00 AM WIB (17:00 UTC previous day)
- * Generates soccer predictions for matches that were selected
- * 
- * Predictions include:
- * - scorePrediction: realistic score (1-0, 2-1, etc)
- * - prediction: Over/Under (used for scoring)
- * - story: narrative explanation with news context
+ * Triggers at 12:00 WIB (05:00 UTC)
+ * Generates predictions for matches that were selected at 11:00 WIB
+ *
+ * Workflow:
+ * - 11:00 WIB: auto-select-epl locks 3 matches
+ * - 12:00 WIB: auto-predict-epl generates predictions for those locked matches
+ * - Window opens, users can buy predictions
  */
 
 import { NextResponse } from "next/server";
-import { isAutoPredictTimeEPL, getEPLWindowStatus, getLockedEPLSelection } from "@/lib/eplWindowManager";
-import { generateSoccerScorePrediction, generateSoccerOverUnder, generateSoccerStory } from "@/lib/predictionGenerator";
+
+import { isAutoPredictTime, getNBAWindowStatus, getD1DateRangeWIB } from "@/lib/nbaWindowManager";
+import { generatePredictionsForMatches, getPredictionForMatch } from "@/lib/predictionGenerator";
 import { fetchLiveMatchData } from "@/lib/sportsFetcher";
+import { supabase } from "@/lib/supabaseClient";
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -22,255 +24,184 @@ async function readCache(): Promise<any> {
     const data = await fs.readFile(CACHE_FILE, 'utf-8');
     return JSON.parse(data);
   } catch (error) {
-    console.error('[EPL Auto-Predict] Error reading cache file:', error);
+    console.error('[Auto-Predict EPL] Error reading cache file:', error);
     return null;
-  }
-}
-
-async function readPurchases(): Promise<Set<string>> {
-  try {
-    const purchasesPath = path.join(process.cwd(), 'data/purchases.json');
-    const data = await fs.readFile(purchasesPath, 'utf-8');
-    const parsed = JSON.parse(data);
-    
-    const eventIds = new Set<string>();
-    if (Array.isArray(parsed.purchases)) {
-      parsed.purchases.forEach((p: any) => {
-        if (p.eventId) eventIds.add(String(p.eventId));
-      });
-    }
-    
-    return eventIds;
-  } catch (error) {
-    console.warn('[EPL Auto-Predict] Could not read purchases:', error);
-    return new Set();
-  }
-}
-
-async function saveEPLRaffle(
-  eventId: string,
-  scorePrediction: string,
-  overUnder: string,
-  story: string,
-  matchData: {
-    home: string;
-    away: string;
-    league: string;
-    datetime: string | null;
-    venue?: string | null;
-  }
-): Promise<void> {
-  try {
-    const raffleFile = path.join(process.cwd(), `data/raffle-${eventId}.json`);
-    
-    const raffleData = {
-      eventId,
-      league: "EPL",
-      matchDetails: {
-        home: matchData.home,
-        away: matchData.away,
-        league: matchData.league,
-        datetime: matchData.datetime,
-        venue: matchData.venue || null,
-      },
-      prediction: overUnder,  // Over/Under for scoring
-      scorePrediction: scorePrediction,  // Score for display
-      story: story,  // Narrative context
-      actualWinner: null,
-      actualResult: null,
-      isCorrect: null,
-      actualTotalGoals: null,
-      createdAt: new Date().toISOString(),
-    };
-
-    await fs.writeFile(raffleFile, JSON.stringify(raffleData, null, 2), 'utf-8');
-    console.log(`[EPL Auto-Predict] Saved prediction for event ${eventId}`);
-    
-    // Also save to predictions.json for consistency with NBA
-    try {
-      const predictionsFile = path.join(process.cwd(), 'data/predictions.json');
-      let predictionsData: any = { predictions: {} };
-      
-      try {
-        const existing = await fs.readFile(predictionsFile, 'utf-8');
-        predictionsData = JSON.parse(existing);
-      } catch (e) {
-        // File doesn't exist or is invalid, start fresh
-      }
-      
-      // Add EPL prediction with full details
-      const fullPrediction = `🏟️ ${matchData.home} vs ${matchData.away}\nPredicted Score: ${scorePrediction}\nOver/Under: ${overUnder}\nNarrative: ${story}\n\nGenerated: ${new Date().toLocaleString()}`;
-      predictionsData.predictions[eventId] = fullPrediction;
-      
-      await fs.writeFile(predictionsFile, JSON.stringify(predictionsData, null, 2), 'utf-8');
-    } catch (e) {
-      console.warn(`[EPL Auto-Predict] Error saving to predictions.json:`, e);
-    }
-  } catch (error) {
-    console.error(`[EPL Auto-Predict] Error saving raffle for ${eventId}:`, error);
   }
 }
 
 export async function GET(req: Request) {
   try {
     const nowUtc = new Date();
-    
+
     // Check authorization header
     const authHeader = req.headers.get('Authorization') || req.headers.get('x-api-key');
     const expectedKey = process.env.WORKER_API_KEY || 'test-key';
-    
+
     if (authHeader !== `Bearer ${expectedKey}` && authHeader !== expectedKey) {
-      console.warn('[EPL Auto-Predict] Unauthorized access attempt');
+      console.warn('[Auto-Predict EPL] Unauthorized access attempt');
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const windowStatus = getEPLWindowStatus(nowUtc);
-    console.log(`[EPL Auto-Predict] Called at ${nowUtc.toISOString()} UTC (${windowStatus.wibHour}:00 WIB)`);
+    const windowStatus = getNBAWindowStatus(nowUtc);
+    console.log(`[Auto-Predict EPL] Called at ${nowUtc.toISOString()} UTC (${windowStatus.wibHour}:00 WIB)`);
 
-    // Check if we're within the auto-predict window (17:00-17:05 UTC = 12:00-12:05 AM WIB)
-    const isValidTime = isAutoPredictTimeEPL(nowUtc);
+    // Check if we're within the auto-predict window (17:00-17:05 UTC = 00:00-00:05 WIB)
+    const isValidTime = nowUtc.getUTCHours() === 17 && nowUtc.getUTCMinutes() < 5;
     if (!isValidTime) {
-      console.warn(`[EPL Auto-Predict] Called at wrong time. Current UTC hour: ${windowStatus.utcHour}, expected: 17`);
-      console.log('[EPL Auto-Predict] Proceeding anyway (manual trigger allowed)');
+      console.warn(`[Auto-Predict EPL] Called at wrong time. Current UTC hour: ${nowUtc.getUTCHours()}, expected: 17`);
+      console.log('[Auto-Predict EPL] Proceeding anyway (manual trigger allowed)');
     }
 
-    // 1. Get locked selection from auto-select worker
-    const lockedIds = await getLockedEPLSelection();
-    
-    if (!lockedIds || lockedIds.length === 0) {
-      console.log('[EPL Auto-Predict] No locked selection found. Was auto-select-epl called?');
+    // 1. Get selected matches from soccer_matches_pending (those with selected_for_date set)
+    const d1Date = getD1DateRangeWIB(nowUtc).dateStringWIB;
+    console.log(`[Auto-Predict EPL] Looking for selected matches for D+1 date: ${d1Date}`);
+
+    const { data: selectedMatches, error: selectError } = await supabase
+      .from('soccer_matches_pending')
+      .select('event_id')
+      .eq('selected_for_date', d1Date)
+      .eq('league', 'English Premier League')
+      .not('event_id', 'is', null);
+
+    if (selectError) {
+      console.error('[Auto-Predict EPL] Error fetching selected matches:', selectError.message);
       return NextResponse.json({
         ok: false,
-        message: "No locked EPL match selection found. Auto-select should have run at 11:00 PM WIB",
+        message: "Failed to fetch selected matches",
         generatedCount: 0
-      }, { status: 400 });
+      }, { status: 500 });
     }
 
-    console.log(`[EPL Auto-Predict] Found locked selection: ${lockedIds.join(', ')}`);
+    const lockedIds = selectedMatches?.map(m => m.event_id) || [];
+    console.log(`[Auto-Predict EPL] Found ${lockedIds.length} selected matches for ${d1Date}:`, lockedIds);
 
-    // 2. Fetch current cache to get match details
-    const cachedData = await readCache();
-    if (!cachedData) {
-      return NextResponse.json({ ok: false, error: "Cache not available" }, { status: 503 });
+    if (lockedIds.length === 0) {
+      console.log('[Auto-Predict EPL] No selected matches found for this D+1 date');
+      return NextResponse.json({
+        ok: true,
+        message: "No selected matches found for this D+1 date",
+        generatedCount: 0
+      });
     }
 
-    // Get details for locked match IDs
-    let eplMatches: any[] = [];
-    try {
-      const byId = new Map<string, any>();
-      
-      if (cachedData.epl?.league && Array.isArray(cachedData.epl.league)) {
-        cachedData.epl.league.forEach((m: any) => {
-          if (m.idEvent) byId.set(String(m.idEvent), m);
-        });
-      }
-      
-      if (cachedData.epl?.daily && Array.isArray(cachedData.epl.daily)) {
-        cachedData.epl.daily.forEach((m: any) => {
-          if (m.idEvent) byId.set(String(m.idEvent), m);
-        });
-      }
-      
-      // Only keep locked matches
-      const lockedSet = new Set(lockedIds);
-      for (const [id, match] of byId) {
-        if (lockedSet.has(id)) {
-          eplMatches.push(match);
-        }
-      }
-      
-      console.log(`[EPL Auto-Predict] Found ${eplMatches.length} locked matches in cache`);
-    } catch (e) {
-      console.warn('[EPL Auto-Predict] Error reading EPL cache:', e);
+    console.log(`[Auto-Predict EPL] Found locked selection: ${lockedIds.join(', ')}`);
+
+    // 2. Get match details from soccer_matches_pending
+    const { data: allPendingMatches, error: fetchError } = await supabase
+      .from('soccer_matches_pending')
+      .select('*')
+      .eq('league', 'English Premier League');
+    if (fetchError) {
+      console.error('[Auto-Predict EPL] Error fetching all match details from Supabase:', fetchError.message);
+      return NextResponse.json({ ok: false, error: "Failed to fetch match details" }, { status: 500 });
     }
+    const pendingMatches = allPendingMatches?.filter(m => lockedIds.includes(m.event_id)) || [];
+
+    let eplMatches: any[] = pendingMatches || [];
+    console.log(`[Auto-Predict EPL] Found ${eplMatches.length} matches in soccer_matches_pending for IDs:`, lockedIds);
+    console.log('[Auto-Predict EPL] Pending matches:', pendingMatches);
 
     if (eplMatches.length === 0) {
-      console.log('[EPL Auto-Predict] No matches found for locked IDs:', lockedIds.join(', '));
+      console.log('[Auto-Predict EPL] No matches found for IDs:', lockedIds.join(', '));
       return NextResponse.json({
         ok: false,
-        message: "Locked matches not found in cache",
+        message: "No matches found for the selected IDs",
         generatedCount: 0
       }, { status: 404 });
     }
 
-    // 3. Check which matches have purchases
-    const purchaseEventIds = await readPurchases();
-    console.log(`[EPL Auto-Predict] Found ${purchaseEventIds.size} matches with purchases`);
-
-    // 4. Check if predictions already exist for these matches
+    // 3. Check if predictions already exist for these matches
     const existingPredictions = new Set<string>();
     try {
-      const dataPath = path.join(process.cwd(), 'data');
-      const files = await fs.readdir(dataPath);
-      for (const file of files) {
-        if (file.startsWith('raffle-') && file.endsWith('.json')) {
-          const matchId = file.replace('raffle-', '').replace('.json', '');
-          existingPredictions.add(matchId);
-        }
+      const { data: existing } = await supabase
+        .from('soccer_predictions')
+        .select('event_id')
+        .in('event_id', lockedIds);
+      if (existing) {
+        existing.forEach((p: any) => existingPredictions.add(p.event_id));
       }
-      console.log(`[EPL Auto-Predict] Found existing predictions for: ${Array.from(existingPredictions).join(', ')}`);
+      console.log(`[Auto-Predict EPL] Found existing predictions for: ${Array.from(existingPredictions).join(', ')}`);
     } catch (e) {
-      console.warn('[EPL Auto-Predict] Error reading data directory:', e);
+      console.warn('[Auto-Predict EPL] Error checking existing predictions:', e);
     }
 
-    // 5. Generate predictions for locked matches that have purchases and don't have predictions yet
-    let generatedCount = 0;
+    // 4. Generate predictions for matches that don't have any yet
+    const matchesToPredict = eplMatches
+      .filter((m: any) => !existingPredictions.has(String(m.event_id)))
+      .map((m: any) => ({
+        id: m.event_id,
+        home: m.home_team,
+        away: m.away_team,
+        league: "English Premier League",
+        datetime: m.event_date,
+        venue: m.venue,
+      }));
 
-    for (const match of eplMatches) {
-      const matchId = String(match.idEvent);
-      
-      // Skip if no purchase for this match
-      if (!purchaseEventIds.has(matchId)) {
-        console.log(`[EPL Auto-Predict] Skipping ${matchId} - no purchases`);
-        continue;
-      }
+    if (matchesToPredict.length === 0) {
+      console.log('[Auto-Predict EPL] All locked matches already have predictions');
+      return NextResponse.json({
+        ok: true,
+        message: "All locked matches already have predictions",
+        timestamp: nowUtc.toISOString(),
+        generatedCount: 0,
+        matchCount: eplMatches.length,
+        matches: eplMatches.map((m: any) => `${m.home_team} vs ${m.away_team}`),
+      });
+    }
 
-      // Skip if prediction already exists
-      if (existingPredictions.has(matchId)) {
-        console.log(`[EPL Auto-Predict] Skipping ${matchId} - prediction already exists`);
-        continue;
-      }
+    console.log(`[Auto-Predict EPL] Generating predictions for ${matchesToPredict.length} matches:`,
+      matchesToPredict.map((m: any) => `${m.home} vs ${m.away}`));
 
-      console.log(`[EPL Auto-Predict] Generating prediction for ${match.strHomeTeam} vs ${match.strAwayTeam}...`);
 
+    const generatedCount = await generatePredictionsForMatches(matchesToPredict, { bypassLeagueCheck: true });
+
+    // Store predictions in Supabase
+    for (const match of matchesToPredict) {
+      console.log(`[Auto-Predict EPL] Processing match ${match.id}: ${match.home} vs ${match.away}`);
       try {
-        const scorePrediction = generateSoccerScorePrediction(match.strHomeTeam, match.strAwayTeam);
-        const overUnder = generateSoccerOverUnder();
-        const story = generateSoccerStory(match.strHomeTeam, match.strAwayTeam, scorePrediction, overUnder);
-
-        await saveEPLRaffle(
-          matchId,
-          scorePrediction,
-          overUnder,
-          story,
-          {
-            home: match.strHomeTeam,
-            away: match.strAwayTeam,
-            league: "English Premier League",
-            datetime: match.strTimestamp || (match.dateEvent && match.strTime ? `${match.dateEvent}T${match.strTime}Z` : null),
-            venue: match.strVenue,
+        const prediction = await getPredictionForMatch(match.id);
+        console.log(`[Auto-Predict EPL] Got prediction for ${match.id}:`, prediction ? 'yes' : 'no');
+        if (prediction && prediction.prediction) {
+          const { predictedWinner, generatedAt } = prediction.prediction;
+          const { id } = match;
+          const { status } = prediction;
+          const upsertData = {
+            event_id: id,
+            prediction_winner: predictedWinner,
+            prediction_time: generatedAt,
+            status: status || 'pending',
+            prediction_text: prediction.predictionText,
+            created_at: new Date().toISOString(),
+          };
+          console.log(`[Auto-Predict EPL] Upserting to soccer_predictions:`, upsertData);
+          const { data, error } = await supabase.from('soccer_predictions').upsert([upsertData], { onConflict: 'event_id' });
+          console.log(`[Auto-Predict EPL] Upsert result for ${match.id}:`, { data, error });
+          if (!error) {
+            console.log(`[Auto-Predict EPL] Successfully saved prediction for match ${match.id}`);
+          } else {
+            console.warn(`[Auto-Predict EPL] Upsert error for ${match.id}:`, error.message);
           }
-        );
-
-        generatedCount++;
-      } catch (error) {
-        console.error(`[EPL Auto-Predict] Error generating prediction for ${matchId}:`, error);
+        } else {
+          console.warn(`[Auto-Predict EPL] No prediction data for match ${match.id}`);
+        }
+      } catch (e) {
+        console.warn(`[Auto-Predict EPL] Error saving prediction for match ${match.id} to Supabase:`, e);
       }
     }
 
-    console.log(`[EPL Auto-Predict] ✅ Successfully generated ${generatedCount} predictions`);
+    console.log(`[Auto-Predict EPL] ✅ Successfully generated ${generatedCount} predictions and stored in Supabase`);
 
     return NextResponse.json({
       ok: true,
-      message: `Generated ${generatedCount} predictions for locked EPL matches with purchases`,
+      message: `Generated ${generatedCount} predictions for locked EPL matches and stored in Supabase`,
       timestamp: nowUtc.toISOString(),
       generatedCount,
-      matchCount: eplMatches.length,
-      matches: eplMatches.map((m: any) => `${m.strHomeTeam} vs ${m.strAwayTeam}`),
+      matchCount: matchesToPredict.length,
+      matches: matchesToPredict.map((m: any) => `${m.home} vs ${m.away}`),
     });
 
   } catch (err: any) {
-    console.error('[EPL Auto-Predict] Error:', err);
+    console.error('[Auto-Predict EPL] Error:', err);
     return NextResponse.json(
       { ok: false, error: String(err?.message ?? err) },
       { status: 500 }

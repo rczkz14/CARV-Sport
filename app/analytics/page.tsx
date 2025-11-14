@@ -64,72 +64,49 @@ export default function AnalyticsPage() {
     try {
       setLoading(true);
       setError(null);
-      
+
       console.log('Fetching analytics data...');
-      
-      // Fetch raffle predictions data
-      const raffleRes = await fetch('/api/raffle');
-      const raffleData = await raffleRes.json();
-      
-      // Get all raffle files (predictions) - not just winners
-      const dataDir = '/data';
-      const raffles = raffleData.raffles || [];
-      
-      console.log('Raffles count:', raffles.length);
-      
-      // Process all prediction raffle files
+
+      // Fetch predictions from database tables
+      const nbaPredictionsRes = await fetch('/api/analytics/predictions?nba=true');
+      const nbaPredictions = await nbaPredictionsRes.json();
+
+      const soccerPredictionsRes = await fetch('/api/analytics/predictions?soccer=true');
+      const soccerPredictions = await soccerPredictionsRes.json();
+
+      console.log('NBA predictions:', nbaPredictions.length);
+      console.log('Soccer predictions:', soccerPredictions.length);
+
+      // Combine all predictions
+      const allPredictions = [...nbaPredictions, ...soccerPredictions];
+      console.log('Total predictions:', allPredictions.length);
+
+      // Process predictions and calculate accuracy
       let totalCorrect = 0;
       let totalPredictions = 0;
       const leagueMap = new Map<string, { correct: number; total: number }>();
-      
-      // Since we can't directly read files from client, fetch from our predictions endpoint
-      // or we can read the raffle data that comes from the API
-      // For now, use a workaround: fetch all matches and check their raffle status
-      
-      const matchesRes = await fetch('/api/matches?history=true');
-      const matchesData = await matchesRes.json();
-      const allMatches = matchesData.events || [];
-      
-      console.log('Matches:', allMatches.length);
-      
-      // Build a map of finished predictions
-      const finishedMatches = allMatches.filter((m: any) => 
-        m.status && /finished|final|ft/i.test(m.status)
-      );
-      
-      console.log('Finished matches:', finishedMatches.length);
-      
-      // For each finished match, check if we have prediction data
-      // We need to call a new endpoint or use existing data
-      // For now, calculate based on what we can access
-      
-      for (const match of finishedMatches) {
+
+      for (const prediction of allPredictions) {
         try {
-          const raffleRes = await fetch(`/api/raffle?eventId=${match.id}`);
-          const raffleJson = await raffleRes.json();
-          
-          if (raffleJson.ok && raffleJson.raffle) {
-            const raffle = raffleJson.raffle;
-            const league = raffle.matchDetails?.league || 'NBA';
-            const isCorrect = raffle.isCorrect === true;
-            
-            if (!leagueMap.has(league)) {
-              leagueMap.set(league, { correct: 0, total: 0 });
-            }
-            
-            const stats = leagueMap.get(league)!;
-            stats.total += 1;
-            if (isCorrect) {
-              stats.correct += 1;
-              totalCorrect += 1;
-            }
-            totalPredictions += 1;
+          const league = prediction.league || 'NBA';
+          const isCorrect = prediction.is_correct === true;
+
+          if (!leagueMap.has(league)) {
+            leagueMap.set(league, { correct: 0, total: 0 });
           }
+
+          const stats = leagueMap.get(league)!;
+          stats.total += 1;
+          if (isCorrect) {
+            stats.correct += 1;
+            totalCorrect += 1;
+          }
+          totalPredictions += 1;
         } catch (e) {
-          console.warn(`Error fetching raffle for ${match.id}:`, e);
+          console.warn(`Error processing prediction ${prediction.event_id}:`, e);
         }
       }
-      
+
       console.log('Total predictions:', totalPredictions, 'Correct:', totalCorrect);
       
       // Build league stats
@@ -279,8 +256,8 @@ export default function AnalyticsPage() {
           </h2>
           
           {leagueStats.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">🔮</div>
+            <div className="text-center py-12 flex flex-col items-center justify-center">
+              <img src="/images/analystic.gif" alt="Analytics" style={{ width: '75%', maxWidth: 400, height: 'auto' }} className="mb-4 object-contain" />
               <div className="text-gray-400 text-lg">No predictions yet</div>
               <p className="text-gray-500 text-sm mt-2">Make your first prediction to see analytics</p>
             </div>

@@ -12,6 +12,7 @@ import { selectMatchesForWindow, selectFootballD1Matches, getSelectedMatches } f
 import { generatePredictionsForMatches } from './predictionGenerator';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { supabase } from './supabaseClient';
 
 const CACHE_FILE = path.join(process.cwd(), 'data/api_fetch.json');
 
@@ -111,6 +112,44 @@ export async function runWorker() {
     ];
 
     const { nba, epl, laliga } = normalizeMatches(nbaRaw, eplRaw, laligaRaw);
+
+    // Step 1a: Store soccer matches in database
+    console.log('[Worker] Storing soccer matches in database...');
+    try {
+      // Store EPL matches
+      for (const match of epl) {
+        await supabase
+          .from('soccer_matches_pending')
+          .upsert({
+            event_id: match.id,
+            home_team: match.home,
+            away_team: match.away,
+            league: match.league,
+            event_date: match.datetime,
+            venue: match.venue,
+            status: match.status || 'pending',
+          }, { onConflict: 'event_id' });
+      }
+
+      // Store LaLiga matches
+      for (const match of laliga) {
+        await supabase
+          .from('soccer_matches_pending')
+          .upsert({
+            event_id: match.id,
+            home_team: match.home,
+            away_team: match.away,
+            league: match.league,
+            event_date: match.datetime,
+            venue: match.venue,
+            status: match.status || 'pending',
+          }, { onConflict: 'event_id' });
+      }
+
+      console.log(`[Worker] Stored ${epl.length} EPL and ${laliga.length} LaLiga matches in database`);
+    } catch (error) {
+      console.warn('[Worker] Failed to store soccer matches in database:', error);
+    }
 
     // Step 1b: Also fetch D-1 football matches (EPL/LaLiga)
     console.log('[Worker] Fetching D-1 football matches from football-data.org...');

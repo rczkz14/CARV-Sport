@@ -1,141 +1,189 @@
 /**
  * Auto-Select LaLiga Worker
- * Automatically selects 6 LaLiga matches within the D to D+16 window
- * Runs during 01:00 - 16:00 WIB window
+ * Triggers at 23:00 WIB (16:00 UTC)
+ * Selects and locks up to 5 D+1 matches for the upcoming window
+ * Adds new matches to existing selection instead of replacing
+ * Does NOT generate predictions yet - that happens at 00:00 WIB
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
+import { isAutoSelectTime, filterNBAMatchesToD1, getNBAWindowStatus, getD1DateRangeWIB } from "@/lib/nbaWindowManager";
+import { fetchLiveMatchData } from "@/lib/sportsFetcher";
 import { promises as fs } from 'fs';
 import path from 'path';
-import {
-  getLaligaWindowDateRange,
-  filterLaligaMatchesByWindow,
-  lockLaligaSelection,
-  isLaligaWindowOpen,
-} from '@/lib/laligaWindowManager';
+import { supabase } from "@/lib/supabaseClient";
 
-export async function GET(request: NextRequest) {
+async function readCache(): Promise<any> {
   try {
-    console.log('[AutoSelectLaLiga] Starting LaLiga match selection...');
+    const CACHE_FILE = path.join(process.cwd(), 'data/api_fetch.json');
+    const data = await fs.readFile(CACHE_FILE, 'utf-8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('[Auto-Select LaLiga] Error reading cache file:', error);
+    return null;
+  }
+}
 
-    // Check if window is open
-    if (!isLaligaWindowOpen()) {
+export async function GET(req: Request) {
+  try {
+    const nowUtc = new Date();
+
+    // Check authorization header
+    const authHeader = req.headers.get('Authorization') || req.headers.get('x-api-key');
+    const expectedKey = process.env.WORKER_API_KEY || 'test-key';
+
+    if (authHeader !== `Bearer ${expectedKey}` && authHeader !== expectedKey) {
+      console.warn('[Auto-Select LaLiga] Unauthorized access attempt');
+      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    }
+
+    const windowStatus = getNBAWindowStatus(nowUtc);
+    console.log(`[Auto-Select LaLiga] Called at ${nowUtc.toISOString()} UTC (${windowStatus.wibHour}:00 WIB)`);
+
+    // Check if we're within the auto-select window (16:00-16:05 UTC = 23:00-23:05 WIB)
+    const isValidTime = nowUtc.getUTCHours() === 16 && nowUtc.getUTCMinutes() < 5;
+    if (!isValidTime) {
+      console.warn(`[Auto-Select LaLiga] Called at wrong time. Current UTC hour: ${nowUtc.getUTCHours()}, expected: 16`);
+      console.log('[Auto-Select LaLiga] Proceeding anyway (manual trigger allowed)');
+    }
+
+    // 1. Get LaLiga matches from Supabase
+    console.log('[Auto-Select LaLiga] Fetching LaLiga matches from Supabase...');
+
+    const { data: laligaMatches, error } = await supabase
+      .from('soccer_matches_pending')
+      .select('*')
+      .eq('league', 'Spanish La Liga');
+    if (error) {
+      console.error('[Auto-Select LaLiga] Error fetching from Supabase:', error.message);
+      return NextResponse.json({ ok: false, error: "Failed to fetch matches" }, { status: 500 });
+    }
+
+    console.log(`[Auto-Select LaLiga] Got ${laligaMatches?.length || 0} LaLiga matches from Supabase`);
+
+    // Live data merge skipped since using Supabase data
+
+    // Normalize match data format for filtering
+    const normalizedMatches = laligaMatches.map((e: any) => ({
+      id: e.event_id,
+      home: e.home_team,
+      away: e.away_team,
+      league: "Spanish La Liga",
+      datetime: e.event_date,
+      venue: e.venue,
+      raw: e,
+    }));
+
+    // 3. Check for existing selected matches for this D+1 date
+    const d1Date = getD1DateRangeWIB(nowUtc).dateStringWIB;
+    console.log(`[Auto-Select LaLiga] D+1 date: ${d1Date}`);
+
+    const { data: existingSelected, error: selectCheckError } = await supabase
+      .from('soccer_matches_pending')
+      .select('event_id')
+      .eq('selected_for_date', d1Date)
+      .eq('league', 'Spanish La Liga')
+      .not('event_id', 'is', null);
+
+    let existingMatchIds: string[] = [];
+    if (!selectCheckError && existingSelected) {
+      existingMatchIds = existingSelected.map(m => m.event_id);
+      console.log(`[Auto-Select LaLiga] Found existing selected matches: ${existingMatchIds.join(', ')}`);
+    } else {
+      console.log('[Auto-Select LaLiga] No existing selected matches for this D+1 date');
+    }
+
+    // 4. Filter to D+1 matches and exclude already locked ones
+    const d1Matches = filterNBAMatchesToD1(normalizedMatches, nowUtc);
+    console.log(`[Auto-Select LaLiga] After D+1 filter: ${d1Matches.length} matches`);
+
+    // Filter out matches that are already locked
+    const availableMatches = d1Matches.filter((m: any) => !existingMatchIds.includes(String(m.id)));
+    console.log(`[Auto-Select LaLiga] Available matches (excluding locked): ${availableMatches.length}`);
+
+    if (availableMatches.length === 0 && existingMatchIds.length >= 5) {
+      console.log('[Auto-Select LaLiga] Already have 5+ locked matches, no need to add more');
+      return NextResponse.json({
+        ok: true,
+        message: `Already have ${existingMatchIds.length} locked matches for D+1`,
+        selectedCount: 0,
+        totalLocked: existingMatchIds.length
+      });
+    }
+
+    // 5. Add new matches to existing selection (up to 5 total)
+    const neededMatches = Math.max(0, 5 - existingMatchIds.length);
+    const newMatchesToAdd = availableMatches.slice(0, neededMatches);
+    const finalSelectedIds = [...existingMatchIds, ...newMatchesToAdd.map((m: any) => String(m.id))];
+
+    console.log(`[Auto-Select LaLiga] Adding ${newMatchesToAdd.length} new matches to existing ${existingMatchIds.length}`);
+    console.log(`[Auto-Select LaLiga] Final selection (${finalSelectedIds.length} total): ${finalSelectedIds.join(', ')}`);
+
+    if (finalSelectedIds.length === 0) {
+      console.log('[Auto-Select LaLiga] No matches to select');
+      return NextResponse.json({
+        ok: true,
+        message: "No matches to select",
+        selectedCount: 0
+      });
+    }
+
+    // 6. Mark the final selection in soccer_matches_pending
+    try {
+      const selectedIds = finalSelectedIds;
+      const d1Date = getD1DateRangeWIB(nowUtc).dateStringWIB;
+
+      // First, clear any existing selections for this date
+      await supabase
+        .from('soccer_matches_pending')
+        .update({ selected_for_date: null, selected_at: null })
+        .eq('selected_for_date', d1Date)
+        .eq('league', 'Spanish La Liga');
+
+      // Then mark the selected matches
+      const { error: selectError } = await supabase
+        .from('soccer_matches_pending')
+        .update({
+          selected_for_date: d1Date,
+          selected_at: nowUtc.toISOString()
+        })
+        .in('event_id', selectedIds);
+
+      if (selectError) {
+        console.error('[Auto-Select LaLiga] Error marking selection in soccer_matches_pending:', selectError.message);
+        return NextResponse.json(
+          { ok: false, error: "Failed to mark selection in database" },
+          { status: 500 }
+        );
+      }
+
+      console.log(`[Auto-Select LaLiga] 🔒 Marked selection in soccer_matches_pending: ${selectedIds.join(', ')}`);
+    } catch (e) {
+      console.warn('[Auto-Select LaLiga] Error marking selection:', e);
       return NextResponse.json(
-        {
-          success: false,
-          message: 'LaLiga selection window is closed (01:00-16:00 WIB only)',
-        },
-        { status: 400 }
+        { ok: false, error: "Failed to mark selection" },
+        { status: 500 }
       );
     }
 
-    // Load API fetch data
-    const apiFetchPath = path.join(process.cwd(), 'data/api_fetch.json');
-    const apiFetchData = JSON.parse(await fs.readFile(apiFetchPath, 'utf-8'));
+    console.log(`[Auto-Select LaLiga] ✅ Successfully updated selection: ${existingMatchIds.length} existing + ${newMatchesToAdd.length} new = ${finalSelectedIds.length} total`);
+    console.log(`[Auto-Select LaLiga] Predictions will be generated at 00:00 WIB by auto-predict worker`);
 
-    if (!apiFetchData.laliga || !apiFetchData.laliga.league) {
-      return NextResponse.json(
-        { success: false, message: 'No LaLiga data in cache' },
-        { status: 400 }
-      );
-    }
-
-    // Get window dates
-    const { startDate, endDate } = getLaligaWindowDateRange();
-    console.log(`[AutoSelectLaLiga] Window: ${startDate} to ${endDate}`);
-
-    // Filter matches by window
-    const laligaMatches = apiFetchData.laliga.league;
-    const windowMatches = filterLaligaMatchesByWindow(
-      laligaMatches.map((m: any) => ({ ...m, dateEvent: m.dateEvent }))
-    );
-
-    console.log(
-      `[AutoSelectLaLiga] Found ${windowMatches.length} LaLiga matches in window`
-    );
-
-    if (windowMatches.length < 6) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: `Only ${windowMatches.length} LaLiga matches found, need minimum 6`,
-          availableMatches: windowMatches.length,
-        },
-        { status: 400 }
-      );
-    }
-
-    // Select first 6 matches from window
-    const selectedMatches = windowMatches.slice(0, 6);
-    const selectedIds = selectedMatches.map((m: any) => m.idEvent);
-
-    // Validate lock
-    const lockResult = await lockLaligaSelection(selectedIds);
-    if (!lockResult.success) {
-      return NextResponse.json(
-        { success: false, message: lockResult.message },
-        { status: 400 }
-      );
-    }
-
-    // Update selected_matches.json
-    const selectedPath = path.join(process.cwd(), 'data/selected_matches.json');
-    const selectedData = JSON.parse(await fs.readFile(selectedPath, 'utf-8'));
-
-    selectedData.laliga = selectedIds;
-    selectedData.lastUpdated = new Date().toISOString();
-
-    await fs.writeFile(selectedPath, JSON.stringify(selectedData, null, 2), 'utf-8');
-
-    // Update window_dates.json
-    const windowPath = path.join(process.cwd(), 'data/window_dates.json');
-    const windowData = JSON.parse(await fs.readFile(windowPath, 'utf-8'));
-
-    // Find or create today's window entry
-    const dateKey = startDate;
-    let dateWindow = windowData.windows.find((w: any) => w.date === dateKey);
-
-    if (!dateWindow) {
-      dateWindow = {
-        date: dateKey,
-        nba: [],
-        epl: [],
-        laliga: [],
-        createdAt: new Date().toISOString(),
-      };
-      windowData.windows.push(dateWindow);
-    }
-
-    dateWindow.laliga = selectedIds;
-    dateWindow.updatedAt = new Date().toISOString();
-
-    await fs.writeFile(windowPath, JSON.stringify(windowData, null, 2), 'utf-8');
-
-    // Log selected matches
-    console.log('[AutoSelectLaLiga] Selected LaLiga matches:');
-    selectedMatches.forEach((m: any) => {
-      console.log(`  ✅ ${m.idEvent}: ${m.strHomeTeam} vs ${m.strAwayTeam}`);
+    return NextResponse.json({
+      ok: true,
+      message: `Updated LaLiga selection: kept ${existingMatchIds.length} existing, added ${newMatchesToAdd.length} new (${finalSelectedIds.length} total)`,
+      timestamp: nowUtc.toISOString(),
+      existingCount: existingMatchIds.length,
+      addedCount: newMatchesToAdd.length,
+      totalCount: finalSelectedIds.length,
+      newMatches: newMatchesToAdd.map(m => `${m.home} vs ${m.away}`),
+      nextStep: "Predictions will generate at 00:00 WIB",
     });
 
+  } catch (err: any) {
+    console.error('[Auto-Select LaLiga] Error:', err);
     return NextResponse.json(
-      {
-        success: true,
-        message: lockResult.message,
-        selectedCount: selectedIds.length,
-        matches: selectedMatches.map((m: any) => ({
-          id: m.idEvent,
-          home: m.strHomeTeam,
-          away: m.strAwayTeam,
-          date: m.dateEvent,
-          time: m.strTime,
-        })),
-      },
-      { status: 200 }
-    );
-  } catch (error) {
-    console.error('[AutoSelectLaLiga] Error:', error);
-    return NextResponse.json(
-      { success: false, error: String(error) },
+      { ok: false, error: String(err?.message ?? err) },
       { status: 500 }
     );
   }

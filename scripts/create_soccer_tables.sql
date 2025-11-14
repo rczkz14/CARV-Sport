@@ -8,6 +8,8 @@ CREATE TABLE soccer_matches_pending (
     event_date TIMESTAMPTZ NOT NULL,
     venue TEXT,
     status TEXT DEFAULT 'pending',
+    selected_for_date DATE,
+    selected_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

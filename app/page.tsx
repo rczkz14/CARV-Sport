@@ -1180,7 +1180,7 @@ export default function Page() {
         {leagueFilter !== "ALL" && (
           <section className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className={`md:col-span-2 p-4 rounded-xl ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-gray-100 border border-gray-300"}`}>
-              <div className="text-xs text-gray-400 mb-2">Windows (Jakarta)</div>
+              <div className="text-xs text-gray-400 mb-2">Windows (Your Local Timezone)</div>
               <div className="text-sm">
                 <div className="bg-indigo-500/10 rounded-lg p-4 mt-2">
                   <div className="font-semibold">
@@ -1286,6 +1286,19 @@ export default function Page() {
                           const alreadyBought = Boolean(purchasedByWallet[ev.id]);
                           const busy = Boolean(processing[ev.id]);
 
+                          // Restrict buyable to only within 24 hours before match start
+                          let buyable24h = false;
+                          const buyableFromInfo = "Available 24 Hours before Match";
+                          if (ev.datetime) {
+                            const matchTime = new Date(ev.datetime).getTime();
+                            const now = Date.now();
+                            const diff = matchTime - now;
+                            // 24 hours = 86400000 ms
+                            if (diff <= 86400000 && diff > 0) {
+                              buyable24h = true;
+                            }
+                          }
+                          const canBuy = ev.buyable && buyable24h;
                           return (
                             <div key={ev.id} className={`p-4 rounded-xl ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-gray-100 border border-gray-300"}`}>
                               <div className="flex justify-between items-start mb-2">
@@ -1357,18 +1370,14 @@ export default function Page() {
                                     <>
                                       <button
                                         onClick={() => handleBuy(ev)}
-                                        disabled={!ev.buyable || busy}
-                                        className={`px-3 py-1 rounded-lg text-sm ${(!ev.buyable) ? "opacity-50 cursor-not-allowed border" : "bg-indigo-600 text-white"}`}
+                                        disabled={!canBuy || busy}
+                                        className={`px-3 py-1 rounded-lg text-sm ${(!canBuy) ? "opacity-50 cursor-not-allowed border" : "bg-indigo-600 text-white"}`}
                                       >
-                                        {busy ? "Processing…" : (ev.buyable ? "Buy Prediction" : "Not available")}
+                                        {busy ? "Processing…" : (canBuy ? "Buy Prediction" : "Not available")}
                                       </button>
-                                      {!ev.buyable && (
+                                      {!canBuy && (
                                         <div className="text-xs opacity-60 mt-1">
-                                          {ev.buyableFrom ? (
-                                            <>Available from {new Date(ev.buyableFrom).toLocaleString()}</>
-                                          ) : (
-                                            <>Available 24 hours before kickoff</>
-                                          )}
+                                          {buyableFromInfo}
                                         </div>
                                       )}
                                     </>
