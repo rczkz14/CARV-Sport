@@ -11,7 +11,7 @@
 
 import { NextResponse } from "next/server";
 
-import { isAutoPredictTime, getNBAWindowStatus, getLockedNBASelection, getD1DateRangeWIB } from "@/lib/nbaWindowManager";
+import { isAutoPredictTime, getNBAWindowStatus, getD1DateRangeWIB } from "@/lib/nbaWindowManager";
 import { generatePredictionsForMatches, getPredictionForMatch } from "@/lib/predictionGenerator";
 import { fetchLiveMatchData } from "@/lib/sportsFetcher";
 import { supabase } from "@/lib/supabaseClient";
@@ -52,49 +52,35 @@ export async function GET(req: Request) {
       console.log('[Auto-Predict] Proceeding anyway (manual trigger allowed)');
     }
 
-    // 1. Get locked selection from Supabase (primary) or fallback to local file
-    let lockedIds: string[] = [];
+    // 1. Get selected matches from nba_matches_pending (those with selected_for_date set)
+    const d1Date = getD1DateRangeWIB(nowUtc).dateStringWIB;
+    console.log(`[Auto-Predict] Looking for selected matches for D+1 date: ${d1Date}`);
 
-    // Try Supabase first
-    const { data: lockedSelection, error: lockError } = await supabase
-      .from('nba_locked_selections')
-      .select('match_ids')
-      .eq('d1_date', getD1DateRangeWIB(nowUtc).dateStringWIB)
-      .single();
+    const { data: selectedMatches, error: selectError } = await supabase
+      .from('nba_matches_pending')
+      .select('event_id')
+      .eq('selected_for_date', d1Date)
+      .not('event_id', 'is', null);
 
-    if (!lockError && lockedSelection?.match_ids && Array.isArray(lockedSelection.match_ids)) {
-      lockedIds = lockedSelection.match_ids;
-      console.log('[Auto-Predict] Found locked selection in Supabase:', lockedIds);
-    } else {
-      console.log('[Auto-Predict] No locked selection in Supabase, trying local file...');
-      // Fallback to local file
-      lockedIds = await getLockedNBASelection() || [];
+    if (selectError) {
+      console.error('[Auto-Predict] Error fetching selected matches:', selectError.message);
+      return NextResponse.json({
+        ok: false,
+        message: "Failed to fetch selected matches",
+        generatedCount: 0
+      }, { status: 500 });
     }
 
-    if (!lockedIds || lockedIds.length === 0) {
-      console.log('[Auto-Predict] No locked selection found anywhere. Falling back to all nba_matches_pending.');
+    const lockedIds = selectedMatches?.map(m => m.event_id) || [];
+    console.log(`[Auto-Predict] Found ${lockedIds.length} selected matches for ${d1Date}:`, lockedIds);
 
-      // Fallback: Get all event_ids from nba_matches_pending
-      const { data: pendingMatches, error } = await supabase
-        .from('nba_matches_pending')
-        .select('event_id');
-      if (error) {
-        console.error('[Auto-Predict] Error fetching pending matches:', error.message);
-        return NextResponse.json({
-          ok: false,
-          message: "No locked selection and failed to fetch pending matches",
-          generatedCount: 0
-        }, { status: 500 });
-      }
-      lockedIds = pendingMatches?.map(m => m.event_id) || [];
-      console.log('[Auto-Predict] Fallback lockedIds:', lockedIds);
-      if (lockedIds.length === 0) {
-        return NextResponse.json({
-          ok: false,
-          message: "No matches found in nba_matches_pending",
-          generatedCount: 0
-        }, { status: 400 });
-      }
+    if (lockedIds.length === 0) {
+      console.log('[Auto-Predict] No selected matches found for this D+1 date');
+      return NextResponse.json({
+        ok: true,
+        message: "No selected matches found for this D+1 date",
+        generatedCount: 0
+      });
     }
 
     console.log(`[Auto-Predict] Found locked selection: ${lockedIds.join(', ')}`);

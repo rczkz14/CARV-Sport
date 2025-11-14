@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { fetchLiveMatchData } from "@/lib/sportsFetcher";
 import { getSelectedMatches, isMatchSelected } from "@/lib/matchSelector";
-import { filterNBAMatchesToD1, getD1DateRangeWIB, getLockedNBASelection } from "@/lib/nbaWindowManager";
+import { filterNBAMatchesToD1, getD1DateRangeWIB } from "@/lib/nbaWindowManager";
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -218,6 +218,9 @@ export async function GET(req: Request) {
     const utcMinutes = hour * 60 + minute;
     const nbaWindowOpen = utcMinutes >= 360 && utcMinutes < 1260; // 06:00–21:00 UTC
 
+    // Determine if soccer window is open (01:00-16:00 WIB, i.e. 18:00-09:00 UTC)
+    const soccerWindowOpen = hour >= 18 || hour < 9;
+
     let result: any[] = [];
     try {
       const { createClient } = await import('@supabase/supabase-js');
@@ -225,22 +228,15 @@ export async function GET(req: Request) {
       const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
       const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
 
-      const table = isHistory ? 'nba_matches_history' : 'nba_matches_pending';
-
-      // Fetch NBA matches from the appropriate table
-      let query = supabase.from(table).select('*');
-
-      // For history, only return matches that are actually finished, have results, or are waiting for results
+      // Fetch NBA matches
+      const nbaTable = isHistory ? 'nba_matches_history' : 'nba_matches_pending';
+      let nbaQuery = supabase.from(nbaTable).select('*');
       if (isHistory) {
-        // Filter for finished matches, matches with scores, or matches waiting for results
-        query = query.or('status.ilike.%finished%,status.ilike.%final%,status.ilike.%ft%,status.ilike.%completed%,status.ilike.%FT%,status.ilike.%Waiting for Result%').or('home_score.not.is.null,away_score.not.is.null');
+        nbaQuery = nbaQuery.or('status.ilike.%finished%,status.ilike.%final%,status.ilike.%ft%,status.ilike.%completed%,status.ilike.%FT%,status.ilike.%Waiting for Result%').or('home_score.not.is.null,away_score.not.is.null');
       }
-
-      const { data, error } = await query;
-      if (error) {
-        console.warn(`Supabase error fetching NBA matches from ${table}:`, error.message);
-      } else if (Array.isArray(data)) {
-        result = data.map((e: any) => ({
+      const { data: nbaData, error: nbaError } = await nbaQuery;
+      if (!nbaError && Array.isArray(nbaData)) {
+        const nbaMatches = nbaData.map((e: any) => ({
           id: e.event_id || e.id,
           league: 'NBA',
           home: e.home_team,
@@ -249,14 +245,41 @@ export async function GET(req: Request) {
           venue: e.venue || null,
           homeScore: e.home_score,
           awayScore: e.away_score,
-          buyable: !isHistory && nbaWindowOpen && (e.status === 'open'), // Buyable only for pending matches when window is open and status is 'open'
+          buyable: !isHistory && nbaWindowOpen && (e.selected_for_date !== null),
           status: e.status || null,
           created_at: e.created_at,
           raw: e,
         }));
+        result.push(...nbaMatches);
       }
+
+      // Fetch soccer matches
+      const soccerTable = isHistory ? 'soccer_matches_history' : 'soccer_matches_pending';
+      let soccerQuery = supabase.from(soccerTable).select('*');
+      if (isHistory) {
+        soccerQuery = soccerQuery.or('status.ilike.%finished%,status.ilike.%final%,status.ilike.%ft%,status.ilike.%completed%,status.ilike.%FT%,status.ilike.%Waiting for Result%').or('home_score.not.is.null,away_score.not.is.null');
+      }
+      const { data: soccerData, error: soccerError } = await soccerQuery;
+      if (!soccerError && Array.isArray(soccerData)) {
+        const soccerMatches = soccerData.map((e: any) => ({
+          id: e.event_id || e.id,
+          league: e.league || 'Soccer',
+          home: e.home_team,
+          away: e.away_team,
+          datetime: e.event_date,
+          venue: e.venue || null,
+          homeScore: e.home_score,
+          awayScore: e.away_score,
+          buyable: !isHistory && soccerWindowOpen && (e.status === 'open'),
+          status: e.status || null,
+          created_at: e.created_at,
+          raw: e,
+        }));
+        result.push(...soccerMatches);
+      }
+
     } catch (e) {
-      console.warn('Could not fetch NBA matches from Supabase:', e);
+      console.warn('Could not fetch matches from Supabase:', e);
     }
     return NextResponse.json({ ok: true, events: result });
 }

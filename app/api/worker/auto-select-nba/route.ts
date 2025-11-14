@@ -7,7 +7,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { isAutoSelectTime, filterNBAMatchesToD1, getNBAWindowStatus, lockNBASelection, getD1DateRangeWIB } from "@/lib/nbaWindowManager";
+import { isAutoSelectTime, filterNBAMatchesToD1, getNBAWindowStatus, getD1DateRangeWIB } from "@/lib/nbaWindowManager";
 import { fetchLiveMatchData } from "@/lib/sportsFetcher";
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -76,22 +76,22 @@ export async function GET(req: Request) {
       raw: e,
     }));
 
-    // 3. Check for existing locked matches for this D+1 date
+    // 3. Check for existing selected matches for this D+1 date
     const d1Date = getD1DateRangeWIB(nowUtc).dateStringWIB;
     console.log(`[Auto-Select] D+1 date: ${d1Date}`);
 
-    const { data: existingLock, error: lockCheckError } = await supabase
-      .from('nba_locked_selections')
-      .select('match_ids')
-      .eq('d1_date', d1Date)
-      .single();
+    const { data: existingSelected, error: selectCheckError } = await supabase
+      .from('nba_matches_pending')
+      .select('event_id')
+      .eq('selected_for_date', d1Date)
+      .not('event_id', 'is', null);
 
     let existingMatchIds: string[] = [];
-    if (!lockCheckError && existingLock?.match_ids) {
-      existingMatchIds = existingLock.match_ids;
-      console.log(`[Auto-Select] Found existing locked matches: ${existingMatchIds.join(', ')}`);
+    if (!selectCheckError && existingSelected) {
+      existingMatchIds = existingSelected.map(m => m.event_id);
+      console.log(`[Auto-Select] Found existing selected matches: ${existingMatchIds.join(', ')}`);
     } else {
-      console.log('[Auto-Select] No existing locked matches for this D+1 date');
+      console.log('[Auto-Select] No existing selected matches for this D+1 date');
     }
 
     // 4. Filter to D+1 matches and exclude already locked ones
@@ -129,38 +129,39 @@ export async function GET(req: Request) {
       });
     }
 
-    // 6. Lock the final selection in Supabase
+    // 6. Mark the final selection in nba_matches_pending
     try {
       const selectedIds = finalSelectedIds;
+      const d1Date = getD1DateRangeWIB(nowUtc).dateStringWIB;
 
-      // Store locked selection in Supabase
-      const lockData = {
-        locked_at: nowUtc.toISOString(),
-        match_ids: selectedIds,
-        d1_date: getD1DateRangeWIB(nowUtc).dateStringWIB,
-        window_start: '06:00:00Z', // 13:00 WIB
-        window_end: '23:30:00Z',   // 04:00 WIB next day
-      };
+      // First, clear any existing selections for this date
+      await supabase
+        .from('nba_matches_pending')
+        .update({ selected_for_date: null })
+        .eq('selected_for_date', d1Date);
 
-      const { error: lockError } = await supabase
-        .from('nba_locked_selections')
-        .upsert([lockData], { onConflict: 'd1_date' });
+      // Then mark the selected matches
+      const { error: selectError } = await supabase
+        .from('nba_matches_pending')
+        .update({
+          selected_for_date: d1Date,
+          selected_at: nowUtc.toISOString()
+        })
+        .in('event_id', selectedIds);
 
-      if (lockError) {
-        console.error('[Auto-Select] Error storing lock in Supabase:', lockError.message);
+      if (selectError) {
+        console.error('[Auto-Select] Error marking selection in nba_matches_pending:', selectError.message);
         return NextResponse.json(
-          { ok: false, error: "Failed to lock selection in database" },
+          { ok: false, error: "Failed to mark selection in database" },
           { status: 500 }
         );
       }
 
-      // Also keep the local file for backward compatibility
-      await lockNBASelection(selectedIds);
-      console.log(`[Auto-Select] 🔒 Locked selection: ${selectedIds.join(', ')}`);
+      console.log(`[Auto-Select] 🔒 Marked selection in nba_matches_pending: ${selectedIds.join(', ')}`);
     } catch (e) {
-      console.warn('[Auto-Select] Error locking selection:', e);
+      console.warn('[Auto-Select] Error marking selection:', e);
       return NextResponse.json(
-        { ok: false, error: "Failed to lock selection" },
+        { ok: false, error: "Failed to mark selection" },
         { status: 500 }
       );
     }

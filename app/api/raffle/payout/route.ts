@@ -3,7 +3,7 @@ import { Connection, PublicKey, Transaction, Keypair } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createTransferInstruction, createAssociatedTokenAccountInstruction } from "@solana/spl-token";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
-import { readJson, readRaffleData, writeRaffleData } from "../utils";
+import { supabase } from "../../../../lib/supabaseClient";
 
 const DATA_DIR = path.resolve(process.cwd(), "data");
 const PURCHASES_FILE = path.join(DATA_DIR, "purchases.json");
@@ -33,29 +33,41 @@ function pickRandom<T>(arr: T[]) {
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({} as any));
-    const { eventId, winnersCount = 1, token = "CARV" } = body;
+    const { eventId, winnersCount = 1, token = "CARV", winner: providedWinner } = body;
     if (!eventId) {
       return NextResponse.json({ error: "eventId required" }, { status: 400 });
     }
 
-    const purchasesData = readJson(PURCHASES_FILE, { purchases: [] });
-    const purchases: any[] = purchasesData.purchases ?? [];
+    // Query purchases from Supabase
+    const { data: purchases, error: purchasesError } = await supabase
+      .from('purchases')
+      .select('*')
+      .eq('event_id', eventId);
 
-    // Filter purchases for this event
-    const entries = purchases.filter(p => String(p.eventId) === String(eventId));
-    if (!entries.length) {
+    if (purchasesError) {
+      console.error('Purchases query error:', purchasesError);
+      return NextResponse.json({ error: "Database error" }, { status: 500 });
+    }
+
+    if (!purchases || purchases.length === 0) {
       return NextResponse.json({ error: "no entries for event" }, { status: 400 });
     }
 
+    const entries = purchases;
+
     // choose unique winners up to winnersCount
-    const winners: string[] = [];
-    const chosenIndices = new Set<number>();
-    const maxW = Math.min(Number(winnersCount) || 1, entries.length);
-    while (winners.length < maxW) {
-      const idx = Math.floor(Math.random() * entries.length);
-      if (chosenIndices.has(idx)) continue;
-      chosenIndices.add(idx);
-      winners.push(String(entries[idx].buyer));
+    let winners: string[] = [];
+    if (providedWinner) {
+      winners = [providedWinner];
+    } else {
+      const chosenIndices = new Set<number>();
+      const maxW = Math.min(Number(winnersCount) || 1, entries.length);
+      while (winners.length < maxW) {
+        const idx = Math.floor(Math.random() * entries.length);
+        if (chosenIndices.has(idx)) continue;
+        chosenIndices.add(idx);
+        winners.push(String(entries[idx].buyer));
+      }
     }
 
     // Send payout to winner
@@ -64,8 +76,8 @@ export async function POST(request: Request) {
     const winnerWallet = new PublicKey(winners[0]); // First winner
     const mintPubkey = new PublicKey(CARV_MINT);
 
-    // Calculate prize pool (0.5 CARV per entry)
-    const entryFee = 0.5;
+    // Calculate prize pool (1 CARV per entry)
+    const entryFee = 1;
     const prizePool = entries.length * entryFee;
     const winnerPayout = prizePool * 0.8; // 80% to winner
     const payoutAmount = toTokenAmountRaw(winnerPayout);
@@ -151,8 +163,25 @@ export async function POST(request: Request) {
       txHash
     };
 
-    // Write to individual file
-    writeRaffleData(eventId, rec);
+    // Insert to Supabase raffles table
+    const raffleRecord = {
+      id: rec.id,
+      event_id: rec.eventId,
+      winner: rec.winners[0],
+      buyer_count: rec.buyerCount,
+      prize_pool: rec.prizePool,
+      winner_payout: rec.winnerPayout,
+      tx_hash: rec.txHash,
+      created_at: rec.createdAt,
+      token: rec.token
+    };
+
+    const { error: insertError } = await supabase.from('nba_raffle').insert(raffleRecord);
+    if (insertError) {
+      console.error('Raffle insert error:', insertError);
+      // Continue, as payout is done
+    }
+
     return NextResponse.json({ ok: true, result: rec });
   } catch (e) {
     console.error("raffle payout error", e);

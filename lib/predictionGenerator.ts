@@ -7,6 +7,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { getRandomSoccerStory, getRandomNBAStory } from './predictionTemplates';
+import { getTeamContext as getSoccerTeamContext, generateMatchupAnalysis as generateSoccerMatchupAnalysis, calculateTeamAdvantage as calculateSoccerAdvantage } from './soccerContext';
 
 interface Prediction {
   eventId: string;
@@ -132,16 +133,16 @@ function generateNBAAIPrediction(homeTeam: string, awayTeam: string): Prediction
   }
 
   const eventId = Math.random().toString(36).slice(2, 10);
-  
+
   // Dynamic score generation based on team strength
   const homeStrength = Math.floor(Math.random() * 15) + 105; // 105-120
   const awayStrength = Math.floor(Math.random() * 15) + 105; // 105-120
-  
+
   // Determine winner with more sophisticated logic
   let isHome = Math.random() < 0.55; // 55% home court advantage baseline
   const homeScore = isHome ? homeStrength + 8 : homeStrength - 8;
   const awayScore = isHome ? awayStrength - 8 : awayStrength + 8;
-  
+
   const totalScore = homeScore + awayScore;
   const predictedWinner = homeScore > awayScore ? homeTeam : awayTeam;
   const losingTeam = homeScore > awayScore ? awayTeam : homeTeam;
@@ -152,11 +153,11 @@ function generateNBAAIPrediction(homeTeam: string, awayTeam: string): Prediction
   let loserStars = "key scorers";
   let winnerDefense = "defense";
   let loserOffense = "offense";
-  
+
   if (teamContextModule) {
     const winnerTeamCtx = teamContextModule.getTeamContext(predictedWinner);
     const loserTeamCtx = teamContextModule.getTeamContext(losingTeam);
-    
+
     if (winnerTeamCtx && winnerTeamCtx.keyPlayers) {
       winnerStars = winnerTeamCtx.keyPlayers.slice(0, 2).join(" and ");
     }
@@ -168,7 +169,7 @@ function generateNBAAIPrediction(homeTeam: string, awayTeam: string): Prediction
   // Professional narratives with player names
   const professionalReviews = [
     `MATCHUP ANALYSIS: ${homeTeam} (${homeScore}) vs ${awayTeam} (${awayScore})
-    
+
 This matchup features contrasting playing styles. ${predictedWinner}'s ${winnerStars} will be critical in limiting ${losingTeam}'s ${loserStars}. The interior battle will be equally crucial—watch for offensive rebounding efficiency and paint defense. ${predictedWinner} has shown superior ball movement in recent games, creating efficiency on both ends. ${losingTeam} will attempt to dictate pace, but ${predictedWinner}'s defensive intensity should prove too much. Key performances from ${winnerStars} will establish early momentum, ultimately determining the game's direction.`,
 
     `TEAM PERFORMANCE PROJECTION: ${predictedWinner} over ${losingTeam}, ${homeScore}-${awayScore}
@@ -187,7 +188,7 @@ Offensive and defensive efficiency ratings favor ${predictedWinner} in this matc
 
 Expect ${winnerStars} to control tempo early, establishing their three-point game while disrupting ${loserStars}' drives. ${losingTeam} will counter with aggressive pick-and-roll execution, but ${predictedWinner}'s on-ball defense should disrupt rhythm. The third quarter will be critical—${winnerStars}' ability to maintain intensity defensively while executing offensive sets separates them. ${loserStars} will likely make a fourth-quarter push, but ${predictedWinner}'s depth and experience should seal the outcome.`,
   ];
-  
+
   const review = professionalReviews[Math.floor(Math.random() * professionalReviews.length)];
 
   return {
@@ -195,6 +196,68 @@ Expect ${winnerStars} to control tempo early, establishing their three-point gam
     predictedWinner,
     predictedScore: `${Math.floor(homeScore)}-${Math.floor(awayScore)}`,
     totalScore: Math.floor(totalScore),
+    confidence,
+    review,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Professional AI prediction logic for soccer predictions
+ * Uses soccer team context, injuries, recent form, and soccer-specific metrics
+ */
+function generateSoccerAIPrediction(homeTeam: string, awayTeam: string): Prediction {
+  const eventId = Math.random().toString(36).slice(2, 10);
+
+  // Get team contexts
+  const homeTeamCtx = getSoccerTeamContext(homeTeam);
+  const awayTeamCtx = getSoccerTeamContext(awayTeam);
+
+  // Calculate team advantage (returns decimal like 2.5 for home advantage)
+  const advantage = calculateSoccerAdvantage(homeTeam, awayTeam);
+
+  // Generate soccer score prediction (realistic scores like 1-0, 2-1, etc.)
+  const scorePrediction = generateSoccerScorePrediction(homeTeam, awayTeam);
+  const [homeGoals, awayGoals] = scorePrediction.split('-').map(Number);
+
+  // Determine winner
+  let predictedWinner: string;
+  if (homeGoals > awayGoals) {
+    predictedWinner = homeTeam;
+  } else if (awayGoals > homeGoals) {
+    predictedWinner = awayTeam;
+  } else {
+    predictedWinner = "Draw";
+  }
+
+  const totalGoals = homeGoals + awayGoals;
+  const overUnder = generateSoccerOverUnder();
+  const confidence = Math.floor(Math.random() * 20) + 58; // 58-78% for soccer
+
+  // Generate professional soccer analysis
+  const matchupAnalysis = generateSoccerMatchupAnalysis(homeTeam, awayTeam);
+  const story = generateSoccerStory(homeTeam, awayTeam, scorePrediction, overUnder);
+
+  // Combine analysis and story
+  const review = `MATCH PREDICTION: ${homeTeam} vs ${awayTeam}
+
+${matchupAnalysis}
+
+SCORE PREDICTION: ${scorePrediction}
+OVER/UNDER PREDICTION: ${overUnder}
+PREDICTED WINNER: ${predictedWinner}
+CONFIDENCE: ${confidence}%
+
+TACTICAL ANALYSIS:
+${story}
+
+This prediction considers current form, historical performance, key player availability, and tactical matchups. Soccer outcomes can be unpredictable, but this analysis provides a professional assessment based on available data.`;
+
+  return {
+    eventId,
+    predictedWinner,
+    predictedScore: scorePrediction,
+    totalScore: totalGoals,
     confidence,
     review,
     generatedAt: new Date().toISOString(),
@@ -274,7 +337,8 @@ Generated: ${prediction.generatedAt}`,
       
       // Add prediction with full details
       const isNBA = /nba|basketball/i.test(matchData.league);
-      const emoji = isNBA ? '🏀' : '⚽';
+      const isSoccer = /soccer|football|epl|premier league|la liga|laliga/i.test(matchData.league);
+      const emoji = isNBA ? '🏀' : isSoccer ? '⚽' : '🏆';
       const fullPrediction = `${emoji} ${matchData.home} vs ${matchData.away}\nPredicted Score: ${prediction.predictedScore}\nTotal Score: ${prediction.totalScore}\nPredicted Winner: ${prediction.predictedWinner}\nConfidence: ${prediction.confidence}%\n\nReview:\n${prediction.review}\n\nGenerated: ${prediction.generatedAt}`;
       predictionsData.predictions[eventId] = fullPrediction;
       
@@ -323,20 +387,14 @@ export async function generatePredictionsForMatches(
 
   for (const match of matches) {
     try {
-      // SAFETY CHECK: Do not generate predictions for NBA or EPL matches in background worker
+      // SAFETY CHECK: Do not generate predictions for NBA matches in background worker
       // NBA predictions should only come from auto-predict-nba endpoint with locked selection
-      // EPL predictions should only come from auto-predict-epl endpoint with locked selection
+      // Soccer predictions (EPL, La Liga) can be generated here with soccer logic
       if (shouldCheckLeague) {
         const isNBA = /nba|basketball/i.test(match.league);
-        const isEPL = /epl|premier league|english premier/i.test(match.league);
-        
+
         if (isNBA) {
           console.warn(`[PredictionGenerator] BLOCKED: Attempted to generate NBA prediction for ${match.id} outside of auto-predict-nba`);
-          continue;
-        }
-        
-        if (isEPL) {
-          console.warn(`[PredictionGenerator] BLOCKED: Attempted to generate EPL prediction for ${match.id} outside of auto-predict-epl`);
           continue;
         }
       }
@@ -348,9 +406,17 @@ export async function generatePredictionsForMatches(
       }
 
       console.log(`[PredictionGenerator] Generating prediction for ${match.home} vs ${match.away}...`);
-      
-      const prediction = generateAIPrediction(match.home, match.away, match.league);
-        
+
+      // Choose prediction logic based on league
+      let prediction: Prediction;
+      const isSoccer = /soccer|football|epl|premier league|la liga|laliga/i.test(match.league);
+
+      if (isSoccer) {
+        prediction = generateSoccerAIPrediction(match.home, match.away);
+      } else {
+        prediction = generateAIPrediction(match.home, match.away, match.league);
+      }
+
       await saveRaffleWithPrediction(match.id, prediction, match);
       
       generated++;
@@ -624,4 +690,126 @@ export async function getRecentNBAHistory(limit: number = 100): Promise<any[]> {
     const bTime = b.datetime ? new Date(b.datetime).getTime() : 0;
     return bTime - aTime;
   }).slice(0, limit);
+}
+
+/**
+ * Save match to soccer history when it finishes (FT)
+ * Called when match reaches Final/FT status
+ */
+export async function saveToSoccerHistory(
+  matchData: {
+    id: string;
+    home: string;
+    away: string;
+    league: string;
+    datetime: string | null;
+    venue?: string | null;
+    homeScore: number | null;
+    awayScore: number | null;
+    status: string;
+  }
+): Promise<void> {
+  try {
+    const historyFile = path.join(process.cwd(), 'data/soccer_history.json');
+
+    // Read existing history
+    let history: any = { matches: [] };
+    try {
+      const existing = await fs.readFile(historyFile, 'utf-8');
+      history = JSON.parse(existing);
+      if (!Array.isArray(history.matches)) history.matches = [];
+    } catch {
+      // File doesn't exist yet, create new
+    }
+
+    // Load prediction for this match
+    const predictionFile = path.join(process.cwd(), `data/raffle-${matchData.id}.json`);
+    let prediction: any = null;
+    try {
+      const predData = await fs.readFile(predictionFile, 'utf-8');
+      prediction = JSON.parse(predData);
+    } catch {
+      console.warn(`[SoccerHistory] No prediction found for ${matchData.id}`);
+    }
+
+    // Determine actual winner and total goals
+    let actualWinner: string | null = null;
+    let totalGoals: number | null = null;
+    let isCorrect: boolean | null = null;
+
+    if (matchData.homeScore !== null && matchData.awayScore !== null) {
+      if (matchData.homeScore > matchData.awayScore) {
+        actualWinner = matchData.home;
+      } else if (matchData.awayScore > matchData.homeScore) {
+        actualWinner = matchData.away;
+      } else {
+        actualWinner = "Draw";
+      }
+
+      totalGoals = matchData.homeScore + matchData.awayScore;
+
+      // Check if prediction was correct (for winner or over/under)
+      if (prediction?.prediction) {
+        // Check winner prediction
+        if (prediction.prediction.predictedWinner && prediction.prediction.predictedWinner !== "Draw") {
+          isCorrect = prediction.prediction.predictedWinner === actualWinner;
+        } else if (prediction.prediction.predictedWinner === "Draw") {
+          isCorrect = actualWinner === "Draw";
+        }
+        // Note: Over/under checking would require parsing the review text
+      }
+    }
+
+    // Create history entry
+    const historyEntry = {
+      id: matchData.id,
+      home: matchData.home,
+      away: matchData.away,
+      league: matchData.league,
+      datetime: matchData.datetime,
+      venue: matchData.venue || null,
+      homeScore: matchData.homeScore,
+      awayScore: matchData.awayScore,
+      totalGoals: totalGoals,
+      status: matchData.status,
+      actualWinner,
+      isCorrect,
+      prediction: prediction?.prediction || null,
+      predictionText: prediction?.predictionText || null,
+      savedAt: new Date().toISOString(),
+    };
+
+    // Check if match already in history
+    const existingIndex = history.matches.findIndex((m: any) => m.id === matchData.id);
+    if (existingIndex >= 0) {
+      // Update existing entry
+      history.matches[existingIndex] = historyEntry;
+      console.log(`[SoccerHistory] Updated match ${matchData.id} in history`);
+    } else {
+      // Add new entry
+      history.matches.push(historyEntry);
+      console.log(`[SoccerHistory] Added match ${matchData.id} to history`);
+    }
+
+    // Save back to file
+    await fs.writeFile(historyFile, JSON.stringify(history, null, 2), 'utf-8');
+    console.log(`[SoccerHistory] ✅ Saved match ${matchData.id} to history`);
+  } catch (error) {
+    console.error(`[SoccerHistory] Error saving to history:`, error);
+  }
+}
+
+/**
+ * Get all soccer history matches
+ */
+export async function getSoccerHistory(): Promise<any[]> {
+  try {
+    const historyFile = path.join(process.cwd(), 'data/soccer_history.json');
+    const data = await fs.readFile(historyFile, 'utf-8');
+    const history = JSON.parse(data);
+    return Array.isArray(history.matches) ? history.matches : [];
+  } catch (error) {
+    console.warn('[SoccerHistory] Could not read history:', error);
+    return [];
+  }
 }

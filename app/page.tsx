@@ -94,7 +94,7 @@ function formatInTimezone(date: Date, timeZone: string): string {
 function getLocalWindowTimes(league: string): string {
   // All windows defined in WIB (UTC+7)
   let wibStart: number, wibEnd: number, label: string;
-  
+
   if (league === "NBA") {
     // NBA: 13:00 (D) — 04:00 (D+1) WIB
     wibStart = 13;
@@ -910,18 +910,20 @@ export default function Page() {
   };
 
   // Click logo => set league and show BUY list (not history)
-  const onSelectLeague = (which: "NBA" | "EPL" | "LaLiga") => {
-    setLeagueFilter(which);
-    setActiveTab("status");
-    setShowHistory(false); // show buyable upcoming matches for selected league
-    setSearchQuery(""); // Clear search query when switching to BUY view
-    setCurrentPage(1); // Reset to first page
-    fetchMatches({ history: false });
+  const onSelectLeague = (which: LeagueType) => {
+    if (which !== "ALL") {
+      setLeagueFilter(which);
+      setActiveTab("status");
+      setShowHistory(false); // show buyable upcoming matches for selected league
+      setSearchQuery(""); // Clear search query when switching to BUY view
+      setCurrentPage(1); // Reset to first page
+      fetchMatches({ history: false });
+    }
   };
 
   // Click header "Status and Predictor History" => show history for selected league
-  const onOpenHistory = (which?: "NBA" | "EPL" | "LaLiga") => {
-    if (which) setLeagueFilter(which);
+  const onOpenHistory = (which?: LeagueType) => {
+    if (which && which !== "ALL") setLeagueFilter(which);
     setActiveTab("status");
     setShowHistory(true);
     setSearchQuery(""); // Clear search query when opening history
@@ -1129,21 +1131,21 @@ export default function Page() {
 
               <div className="flex items-center justify-center gap-12">
                 <button
+                  onClick={() => onSelectLeague("EPL")}
+                  className="flex flex-col items-center gap-3"
+                  aria-label="Select EPL"
+                >
+                  <img src="/images/epl-logo.png" alt="EPL" className="w-36 h-36 object-contain rounded-lg" />
+                  <div className="mt-2 font-semibold">EPL</div>
+                </button>
+
+                <button
                   onClick={() => onSelectLeague("NBA")}
                   className="flex flex-col items-center gap-3"
                   aria-label="Select NBA"
                 >
                   <img src="/images/NBA-Logo.png" alt="NBA" className="w-36 h-36 object-contain rounded-lg" />
                   <div className="mt-2 font-semibold">NBA</div>
-                </button>
-
-                <button
-                  onClick={() => onSelectLeague("EPL")}
-                  className="flex flex-col items-center gap-3"
-                  aria-label="Select EPL"
-                >
-                  <img src="/images/epl-logo.png" alt="EPL" className="w-56 h-56 object-contain rounded-lg" />
-                  <div className="mt-2 font-semibold">EPL</div>
                 </button>
 
                 <button
@@ -1177,7 +1179,7 @@ export default function Page() {
         {/* Windows + info panel (visible when league selected) */}
         {leagueFilter !== "ALL" && (
           <section className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="md:col-span-2 p-4 rounded-xl" style={{ border: "1px solid", borderColor: darkMode ? "#2d3748" : "#e5e7eb" }}>
+            <div className={`md:col-span-2 p-4 rounded-xl ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-gray-100 border border-gray-300"}`}>
               <div className="text-xs text-gray-400 mb-2">Windows (Jakarta)</div>
               <div className="text-sm">
                 <div className="bg-indigo-500/10 rounded-lg p-4 mt-2">
@@ -1194,11 +1196,11 @@ export default function Page() {
               <div className="mt-6 flex items-center justify-between">
                 <div className="flex flex-col gap-4">
                   <div className="flex items-center gap-3">
-                    <button 
-                      onClick={() => { 
-                        setShowHistory(false); 
-                        fetchMatches({ history: false }); 
-                      }} 
+                    <button
+                      onClick={() => {
+                        setShowHistory(false);
+                        fetchMatches({ history: false });
+                      }}
                       className="px-3 py-1 rounded border"
                     >
                       Matches
@@ -1206,21 +1208,21 @@ export default function Page() {
                     <button onClick={() => onOpenHistory(leagueFilter)} className="px-3 py-1 rounded border">View Status & History</button>
                   </div>
                   <div className="flex justify-start">
-                    <img 
+                    <img
                       src={
-                        leagueFilter === "NBA" ? "/images/NBA-Logo.png" : 
+                        leagueFilter === "NBA" ? "/images/NBA-Logo.png" :
                         leagueFilter === "EPL" ? "/images/epl-logo.png" :
                         "/images/laliga-logo.png"
-                      } 
-                      alt={leagueFilter} 
-                      className="h-16 w-16 object-contain" 
+                      }
+                      alt={leagueFilter}
+                      className="h-16 w-16 object-contain"
                     />
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="p-4 rounded-xl" style={{ border: "1px solid", borderColor: darkMode ? "#2d3748" : "#e5e7eb" }}>
+            <div className={`p-4 rounded-xl ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-gray-100 border border-gray-300"}`}>
               <div className="text-xs text-gray-400 mb-2">Raffle Information</div>
               <div className="text-sm">
                 <div className="bg-indigo-500/10 rounded-lg p-4 mt-2">
@@ -1251,131 +1253,146 @@ export default function Page() {
               <h2 className="text-xl font-semibold mb-4">Buy Predictions — {leagueFilter}</h2>
               {loading && <div className="text-sm opacity-70">Loading matches…</div>}
               <div className="space-y-4">
-                {events
-                  .filter(ev => {
-                    if (leagueFilter === "NBA") return /nba/i.test(ev.league ?? "");
-                    if (leagueFilter === "EPL") return /premier league|english premier|epl/i.test(ev.league ?? "") || /soccer|football/i.test(ev.league ?? "");
-                    if (leagueFilter === "LaLiga") return /laliga|la liga/i.test(ev.league ?? "") || /spanish|la\s+liga/i.test(ev.league ?? "");
-                    return true;
-                  })
-                  // Show matches if not started, regardless of window status
-                  .filter(ev => !isMatchStarted(ev))
-                  // Sort by datetime (earliest first)
-                  .sort((a, b) => {
-                    const timeA = a.datetime ? new Date(a.datetime).getTime() : Number.MAX_SAFE_INTEGER;
-                    const timeB = b.datetime ? new Date(b.datetime).getTime() : Number.MAX_SAFE_INTEGER;
-                    return timeA - timeB;
-                  })
-                  .map(ev => {
-                    const jk = localPartsFromUtcIso(ev.datetime ?? null);
-                    const localDate = jk ? jk.date : "(unknown)";
-                    const localTime = jk ? `${String(jk.hour).padStart(2,"0")}:${String(jk.minute).padStart(2,"0")}` : "";
-                    const alreadyBought = Boolean(purchasedByWallet[ev.id]);
-                    const busy = Boolean(processing[ev.id]);
+                {(() => {
+                  const filteredEvents = events
+                    .filter(ev => {
+                      if (leagueFilter === "NBA") return /nba/i.test(ev.league ?? "");
+                      if (leagueFilter === "EPL") return /premier league|english premier|epl/i.test(ev.league ?? "");
+                      if (leagueFilter === "LaLiga") return /laliga|la liga/i.test(ev.league ?? "");
+                      return true;
+                    })
+                    // Show matches if not started, regardless of window status
+                    .filter(ev => !isMatchStarted(ev))
+                    // Sort by datetime (earliest first)
+                    .sort((a, b) => {
+                      const timeA = a.datetime ? new Date(a.datetime).getTime() : Number.MAX_SAFE_INTEGER;
+                      const timeB = b.datetime ? new Date(b.datetime).getTime() : Number.MAX_SAFE_INTEGER;
+                      return timeA - timeB;
+                    });
 
-                    return (
-                      <div key={ev.id} className={`p-4 rounded-xl ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-gray-100 border border-gray-300"}`}>
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-indigo-400">{ev.league}</span>
-                            <span className="text-xs text-gray-500">Event #{ev.id}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <span className="text-sm font-bold">{CARV_CHARGE} $CARV</span>
-                            <img src="/images/carv-token.png" alt="CARV" className="w-4 h-4 object-contain" />
+                  return (
+                    <>
+                      {filteredEvents.length === 0 && !loading && (leagueFilter === "EPL" || leagueFilter === "LaLiga") ? (
+                        <div className={`p-4 rounded-xl text-center py-8 ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-gray-100 border border-gray-300"}`}>
+                          <div className="text-sm opacity-70">
+                            No matches available in the near future.
                           </div>
                         </div>
-                        
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <div className="flex flex-col gap-2">
-                              <div className="flex items-center justify-center gap-6">
-                                <div className="flex flex-col items-center gap-2">
-                                  {getTeamLogo(ev.home, ev.league) ? (
-                                    <img
-                                      src={getTeamLogo(ev.home, ev.league)}
-                                      alt={ev.home}
-                                      className="w-24 h-24 object-contain"
-                                    />
-                                  ) : (
-                                    <div className="w-24 h-24 bg-gray-700/30 rounded-lg flex items-center justify-center text-2xl font-bold opacity-70">
-                                      {ev.home.charAt(0)}
-                                    </div>
-                                  )}
-                                  <span className="text-sm font-semibold">{ev.home}</span>
+                      ) : (
+                        filteredEvents.map(ev => {
+                          const jk = localPartsFromUtcIso(ev.datetime ?? null);
+                          const localDate = jk ? jk.date : "(unknown)";
+                          const localTime = jk ? `${String(jk.hour).padStart(2,"0")}:${String(jk.minute).padStart(2,"0")}` : "";
+                          const alreadyBought = Boolean(purchasedByWallet[ev.id]);
+                          const busy = Boolean(processing[ev.id]);
+
+                          return (
+                            <div key={ev.id} className={`p-4 rounded-xl ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-gray-100 border border-gray-300"}`}>
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm text-indigo-400">{ev.league}</span>
+                                  <span className="text-xs text-gray-500">Event #{ev.id}</span>
                                 </div>
-                                <div className="font-bold opacity-60 text-xl">VS</div>
-                                <div className="flex flex-col items-center gap-2">
-                                  {getTeamLogo(ev.away, ev.league) ? (
-                                    <img
-                                      src={getTeamLogo(ev.away, ev.league)}
-                                      alt={ev.away}
-                                      className="w-24 h-24 object-contain"
-                                    />
-                                  ) : (
-                                    <div className="w-24 h-24 bg-gray-700/30 rounded-lg flex items-center justify-center text-2xl font-bold opacity-70">
-                                      {ev.away.charAt(0)}
-                                    </div>
-                                  )}
-                                  <span className="text-sm font-semibold">{ev.away}</span>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-sm font-bold">{CARV_CHARGE} $CARV</span>
+                                  <img src="/images/carv-token.png" alt="CARV" className="w-4 h-4 object-contain" />
                                 </div>
                               </div>
-                              {!alreadyBought && <div className="text-sm opacity-90 text-center"><i>Auto prediction coming soon</i></div>}
-                              {ev.datetime && (
-                                <div className="text-xs opacity-60 text-center">
-                                  <div>{formatInWIB(new Date(ev.datetime))} (WIB)</div>
-                                  <div>{new Date(ev.datetime).toLocaleString('en-US', { timeZone: 'UTC' })} (UTC)</div>
-                                </div>
-                              )}
-                              {ev.venue && <div className="text-xs opacity-60 text-center">Venue: {ev.venue}</div>}
-                            </div>
-                          </div>
 
-                          <div className="flex flex-col items-end gap-2 ml-4">
-                            <div className="flex items-center gap-1 text-sm text-gray-400">
-                              <span>👥</span>
-                              <span>{buyerCounts[ev.id] ?? 0} buyer{(buyerCounts[ev.id] ?? 0) !== 1 ? 's' : ''}</span>
-                            </div>
-                            {alreadyBought || (ev.status && /finished|ft|final/i.test(String(ev.status))) ? (
-                              <>
-                                <button onClick={() => handleViewPrediction(ev)} className="px-3 py-1 rounded-lg text-sm bg-green-600 text-white hover:bg-green-700">View Prediction</button>
-                              </>
-                            ) : (
-                              <>
-                                <button
-                                  onClick={() => handleBuy(ev)}
-                                  disabled={!ev.buyable || busy}
-                                  className={`px-3 py-1 rounded-lg text-sm ${(!ev.buyable) ? "opacity-50 cursor-not-allowed border" : "bg-indigo-600 text-white"}`}
-                                >
-                                  {busy ? "Processing…" : (ev.buyable ? "Buy Prediction" : "Not available")}
-                                </button>
-                                {!ev.buyable && (
-                                  <div className="text-xs opacity-60 mt-1">
-                                    {ev.buyableFrom ? (
-                                      <>Available from {new Date(ev.buyableFrom).toLocaleString()}</>
-                                    ) : (
-                                      <>Predictions can be purchased up to 24 hours before match start</>
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <div className="flex flex-col gap-2">
+                                    <div className="flex items-center justify-center gap-6">
+                                      <div className="flex flex-col items-center gap-2">
+                                        {getTeamLogo(ev.home, ev.league) ? (
+                                          <img
+                                            src={getTeamLogo(ev.home, ev.league)}
+                                            alt={ev.home}
+                                            className="w-24 h-24 object-contain"
+                                          />
+                                        ) : (
+                                          <div className="w-24 h-24 bg-gray-700/30 rounded-lg flex items-center justify-center text-2xl font-bold opacity-70">
+                                            {ev.home.charAt(0)}
+                                          </div>
+                                        )}
+                                        <span className="text-sm font-semibold">{ev.home}</span>
+                                      </div>
+                                      <div className="font-bold opacity-60 text-xl">VS</div>
+                                      <div className="flex flex-col items-center gap-2">
+                                        {getTeamLogo(ev.away, ev.league) ? (
+                                          <img
+                                            src={getTeamLogo(ev.away, ev.league)}
+                                            alt={ev.away}
+                                            className="w-24 h-24 object-contain"
+                                          />
+                                        ) : (
+                                          <div className="w-24 h-24 bg-gray-700/30 rounded-lg flex items-center justify-center text-2xl font-bold opacity-70">
+                                            {ev.away.charAt(0)}
+                                          </div>
+                                        )}
+                                        <span className="text-sm font-semibold">{ev.away}</span>
+                                      </div>
+                                    </div>
+                                    {!alreadyBought && <div className="text-sm opacity-90 text-center"><i>Auto prediction coming soon</i></div>}
+                                    {ev.datetime && (
+                                      <div className="text-xs opacity-60 text-center">
+                                        <div>{formatInWIB(new Date(ev.datetime))} (WIB)</div>
+                                        <div>{new Date(ev.datetime).toLocaleString('en-US', { timeZone: 'UTC' })} (UTC)</div>
+                                      </div>
                                     )}
+                                    {ev.venue && <div className="text-xs opacity-60 text-center">Venue: {ev.venue}</div>}
                                   </div>
-                                )}
-                              </>
-                            )}
-                          </div>
+                                </div>
+
+                                <div className="flex flex-col items-end gap-2 ml-4">
+                                  <div className="flex items-center gap-1 text-sm text-gray-400">
+                                    <span>👥</span>
+                                    <span>{buyerCounts[ev.id] ?? 0} buyer{(buyerCounts[ev.id] ?? 0) !== 1 ? 's' : ''}</span>
+                                  </div>
+                                  {alreadyBought || (ev.status && /finished|ft|final/i.test(String(ev.status))) ? (
+                                    <>
+                                      <button onClick={() => handleViewPrediction(ev)} className="px-3 py-1 rounded-lg text-sm bg-green-600 text-white hover:bg-green-700">View Prediction</button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button
+                                        onClick={() => handleBuy(ev)}
+                                        disabled={!ev.buyable || busy}
+                                        className={`px-3 py-1 rounded-lg text-sm ${(!ev.buyable) ? "opacity-50 cursor-not-allowed border" : "bg-indigo-600 text-white"}`}
+                                      >
+                                        {busy ? "Processing…" : (ev.buyable ? "Buy Prediction" : "Not available")}
+                                      </button>
+                                      {!ev.buyable && (
+                                        <div className="text-xs opacity-60 mt-1">
+                                          {ev.buyableFrom ? (
+                                            <>Available from {new Date(ev.buyableFrom).toLocaleString()}</>
+                                          ) : (
+                                            <>Available 24 hours before kickoff</>
+                                          )}
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                      <div className="mt-10 border-t border-gray-500 pt-6 text-sm opacity-70 flex justify-between items-center">
+                        <div>Made by Erxie0x — powered by CARV SVM Testnet 🚀</div>
+                        <div className="flex items-center gap-2 bg-white rounded-lg p-3 shadow-lg">
+                          <a href="https://x.com/erxie0x" target="_blank" rel="noopener noreferrer" title="Follow on X">
+                            <img src="/images/twitter-logo.png" alt="Twitter" className="w-8 h-8 object-contain hover:scale-110 transition-transform cursor-pointer" />
+                          </a>
+                          <a href="https://play.carv.io/profile/erxie" target="_blank" rel="noopener noreferrer" title="View CARV Profile">
+                            <img src="/images/carv-profile-logo.png" alt="CARV Profile" className="w-8 h-8 object-contain hover:scale-110 transition-transform cursor-pointer" />
+                          </a>
                         </div>
                       </div>
-                    );
-                  })}
-                <div className="mt-10 border-t border-gray-500 pt-6 text-sm opacity-70 flex justify-between items-center">
-                  <div>Made by Erxie0x — powered by CARV SVM Testnet 🚀</div>
-                  <div className="flex items-center gap-2 bg-white rounded-lg p-3 shadow-lg">
-                    <a href="https://x.com/erxie0x" target="_blank" rel="noopener noreferrer" title="Follow on X">
-                      <img src="/images/twitter-logo.png" alt="Twitter" className="w-8 h-8 object-contain hover:scale-110 transition-transform cursor-pointer" />
-                    </a>
-                    <a href="https://play.carv.io/profile/erxie" target="_blank" rel="noopener noreferrer" title="View CARV Profile">
-                      <img src="/images/carv-profile-logo.png" alt="CARV Profile" className="w-8 h-8 object-contain hover:scale-110 transition-transform cursor-pointer" />
-                    </a>
-                  </div>
-                </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           ) : (
@@ -1383,7 +1400,7 @@ export default function Page() {
             <div>
               <h2 className="text-xl font-semibold mb-4">Status & History — {leagueFilter}</h2>
               {loading && <div className="text-sm opacity-70">Loading matches…</div>}
-              
+
               {/* Search bar */}
               <div className="mb-6">
                 <input
@@ -1509,7 +1526,7 @@ export default function Page() {
                                     </div>
                                   )}
                                   {ev.venue && <div className="text-xs opacity-60 mt-1">Venue: {ev.venue}</div>}
-                                  
+
                                   <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
                                     <span>👥</span>
                                     <span>{buyerCounts[ev.id] ?? 0} buyer{(buyerCounts[ev.id] ?? 0) !== 1 ? 's' : ''}</span>
@@ -1538,11 +1555,11 @@ export default function Page() {
                                       <div className="text-xs opacity-70">Not purchased</div>
                                     )
                                   )}
-                                  
+
                                   {isFinished && predictionResults[ev.id] && (
                                     <span className={`text-xs px-2 py-1 rounded font-bold ${
-                                      predictionResults[ev.id].isCorrect 
-                                        ? 'bg-green-500/20 text-green-400' 
+                                      predictionResults[ev.id].isCorrect
+                                        ? 'bg-green-500/20 text-green-400'
                                         : 'bg-red-500/20 text-red-400'
                                     }`}>
                                       {predictionResults[ev.id].isCorrect ? '✅ CORRECT' : '❌ INCORRECT'}
@@ -1618,7 +1635,7 @@ export default function Page() {
             <h2 className="text-2xl font-bold mb-4">Prediction</h2>
             <div className="space-y-4">
               <div className="mb-4">
-                <h3 className="text-xl mb-2">🏀 {currentMatch?.home} vs {currentMatch?.away}</h3>
+                <h3 className="text-xl mb-2">{leagueFilter === "EPL" || leagueFilter === "LaLiga" ? "⚽" : "🏀"} {currentMatch?.home} vs {currentMatch?.away}</h3>
                 <div className="space-y-1">
                   <div><strong>Predicted Score:</strong> {predictionDetails?.predictedScore}</div>
                   <div><strong>Total Score:</strong> {predictionDetails?.totalScore}</div>

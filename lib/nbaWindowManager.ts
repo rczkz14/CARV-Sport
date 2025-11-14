@@ -1,12 +1,12 @@
 /**
  * NBA Window Manager
  * Handles NBA-specific window logic and D+1 filtering
- * 
+ *
  * NBA Window (WIB = UTC+7):
  * - Opens: 13:00 WIB (D)
- * - Closes: 06:30 WIB (D+1)
- * - In UTC: 06:00 — 23:30 UTC (same day)
- * 
+ * - Closes: 04:00 AM WIB (D+1)
+ * - In UTC: 06:00 — 21:00 UTC (same day)
+ *
  * For Matches Tab:
  * - Show only D+1 matches (next calendar day)
  * - Max 5 matches
@@ -28,11 +28,11 @@ export function getNBAWindowStatus(nowUtc: Date = new Date()) {
   const utcHour = nowUtc.getUTCHours();
   const wibHour = utcToWIB(utcHour);
 
-  // NBA window in WIB: 13:00 — 06:30 (next day)
-  // In UTC: 06:00 — 23:30 same UTC day
+  // NBA window in WIB: 13:00 — 04:00 AM (next day)
+  // In UTC: 06:00 — 21:00 same UTC day
   const utcMinutes = nowUtc.getUTCHours() * 60 + nowUtc.getUTCMinutes();
   const openMinutes = 6 * 60; // 06:00 UTC
-  const closeMinutes = 23 * 60 + 30; // 23:30 UTC
+  const closeMinutes = 21 * 60; // 21:00 UTC
   const isOpen = utcMinutes >= openMinutes && utcMinutes < closeMinutes;
 
   // Calculate minutes until next transition
@@ -40,7 +40,7 @@ export function getNBAWindowStatus(nowUtc: Date = new Date()) {
   let isOpeningNext: boolean;
 
   if (isOpen) {
-    // Window is open, next change is CLOSE at 23:30 UTC
+    // Window is open, next change is CLOSE at 21:00 UTC
     minutesUntilNextChange = closeMinutes - utcMinutes;
     isOpeningNext = false; // Next event is close
   } else {
@@ -73,8 +73,8 @@ export function getNBAWindowStatus(nowUtc: Date = new Date()) {
  * 
  * Logic:
  * - If we're between 13:00 WIB and 23:59 WIB on day N: D+1 is day N+1
- * - If we're between 00:00 WIB and 04:00 WIB on day N+1: D+1 is STILL day N+1 (same window!)
- * - If we're between 04:00 WIB and 13:00 WIB: No window open, but D+1 would be day N+2 (next window)
+ * - If we're between 00:00 WIB and 04:00 AM WIB on day N+1: D+1 is STILL day N+1 (same window!)
+ * - If we're between 04:00 AM WIB and 13:00 WIB: No window open, but D+1 would be day N+2 (next window)
  * 
  * WIB Timezone Conversion:
  * - WIB = UTC + 7 hours
@@ -104,7 +104,7 @@ export function getD1DateRangeWIB(nowUtc: Date = new Date()) {
    if (nowWIBHour >= 13) {
      // Window opened today, D+1 is tomorrow
      d1Date = new Date(todayDate.getTime() + 24 * 60 * 60 * 1000);
-   } else if (nowWIBHour < 6.5) {
+   } else if (nowWIBHour < 4.0) {
      // Window opened yesterday, D+1 is today
      d1Date = todayDate;
    } else {
