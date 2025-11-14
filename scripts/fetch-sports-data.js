@@ -26,13 +26,11 @@ async function fetchWithRetry(url, retries = 3) {
 }
 
 async function fetchNBAMatchesForToday() {
-  // Get tomorrow's date in UTC (SportDB expects UTC)
+  // Get today's date in UTC (SportDB expects UTC)
   const now = new Date();
-  const tomorrow = new Date(now);
-  tomorrow.setUTCDate(now.getUTCDate() + 1);
-  const utcYear = tomorrow.getUTCFullYear();
-  const utcMonth = pad(tomorrow.getUTCMonth() + 1);
-  const utcDate = pad(tomorrow.getUTCDate());
+  const utcYear = now.getUTCFullYear();
+  const utcMonth = pad(now.getUTCMonth() + 1);
+  const utcDate = pad(now.getUTCDate());
   const dateStr = `${utcYear}-${utcMonth}-${utcDate}`;
 
   console.log(`Fetching NBA matches for ${dateStr} from SportDB...`);
@@ -61,7 +59,7 @@ async function fetchNBAMatchesForToday() {
       home_team: m.strHomeTeam,
       away_team: m.strAwayTeam,
       event_date: m.strTimestamp || null,
-      status: 'pending',
+      status: 'open',
       created_at: new Date().toISOString(),
       venue: m.strVenue || null,
       home_score: null,
