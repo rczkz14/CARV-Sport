@@ -1,5 +1,4 @@
 {
-  "framework": "nextjs",
   "crons": [
     {
       "path": "/api/worker/nba-window-close",
