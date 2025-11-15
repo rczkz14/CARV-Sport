@@ -48,7 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // GET /api/purchases?eventid=xxx&buyer=yyy
     if (req.method === 'GET') {
       const { eventid, buyer } = req.query;
-      let query = supabase.from('purchases').select('*');
+      let query = supabase.from('purchases').select('eventid, buyer, txid, amount, token, timestamp');
       if (eventid && buyer) {
         query = query.eq('eventid', eventid).eq('buyer', buyer);
       } else if (eventid) {
@@ -70,7 +70,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
       const { data: existing, error: existingError } = await supabase
         .from('purchases')
-        .select('*')
+        .select('eventid, buyer, txid, amount, token, timestamp')
         .eq('eventid', eventid)
         .eq('buyer', buyer);
       if (existingError) {
@@ -170,7 +170,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         txid: txid ?? null,
         amount: amount ?? null,
         token: token ?? null,
-        prediction: (isNBA || isSoccer) ? null : finalPrediction, // Don't store prediction for NBA/Soccer in purchases
         timestamp: new Date().toISOString(),
       };
       const { error: insertError } = await supabase.from('purchases').insert([rec]);
