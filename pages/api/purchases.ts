@@ -88,7 +88,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const matchData = await matchRes.json();
     const match = matchData.events?.find((e: any) => String(e.id) === String(eventid));
     const isNBA = match ? (match.league?.toLowerCase().includes('nba') || match.league?.toLowerCase().includes('basketball')) : false;
-    console.log('[API] Match league:', match?.league, 'isNBA:', isNBA, 'eventid:', eventid);
+    const isSoccer = match ? (match.league?.toLowerCase().includes('premier league') || match.league?.toLowerCase().includes('english premier') || match.league?.toLowerCase().includes('epl') || match.league?.toLowerCase().includes('la liga') || match.league?.toLowerCase().includes('laliga') || match.league?.toLowerCase().includes('spanish')) : false;
+    console.log('[API] Match league:', match?.league, 'isNBA:', isNBA, 'isSoccer:', isSoccer, 'eventid:', eventid);
 
     if (!finalPrediction) {
       if (match) {
@@ -123,9 +124,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               console.log('[API] Stored NBA prediction');
             }
           }
+        } else if (isSoccer) {
+          // Check if prediction exists in soccer_predictions
+          const { data: existingPred, error: predError } = await supabase
+            .from('soccer_predictions')
+            .select('prediction_text')
+            .eq('event_id', eventid)
+            .single();
+          console.log('[API] Soccer check result:', { existingPred, predError });
+          if (!predError && existingPred) {
+            finalPrediction = existingPred.prediction_text;
+            console.log('[API] Using existing soccer prediction');
+          } else {
+            // Generate and store
+            console.log('[API] Generating new soccer prediction');
+            const predData = await generatePrediction(match);
+            finalPrediction = predData.text;
+            // Store in soccer_predictions
+            const { error: insertPredError } = await supabase.from('soccer_predictions').upsert([{
+              event_id: eventid,
+              prediction_winner: predData.winner,
+              prediction_time: new Date().toISOString(),
+              status: 'pending',
+              prediction_text: predData.text,
+              created_at: new Date().toISOString(),
+            }], { onConflict: 'event_id' });
+            if (insertPredError) {
+              console.error('[API] Failed to store soccer prediction:', insertPredError.message);
+            } else {
+              console.log('[API] Stored soccer prediction');
+            }
+          }
         } else {
-          // Soccer or other, generate per purchase
-          console.log('[API] Generating soccer prediction');
+          // Other leagues, generate per purchase
+          console.log('[API] Generating other league prediction');
           finalPrediction = (await generatePrediction(match)).text;
         }
       } else {
@@ -138,7 +170,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         txid: txid ?? null,
         amount: amount ?? null,
         token: token ?? null,
-        prediction: isNBA ? null : finalPrediction, // Don't store prediction for NBA in purchases
+        prediction: (isNBA || isSoccer) ? null : finalPrediction, // Don't store prediction for NBA/Soccer in purchases
         timestamp: new Date().toISOString(),
       };
       const { error: insertError } = await supabase.from('purchases').insert([rec]);

@@ -87,28 +87,35 @@ export async function GET(req: Request) {
             .eq('event_id', pred.event_id)
             .single();
 
-          if (!historyError && matchHistory && matchHistory.status === 'FT' &&
-              matchHistory.home_score !== null && matchHistory.away_score !== null) {
+          const hasResult = !historyError && matchHistory && matchHistory.status === 'FT' &&
+              matchHistory.home_score !== null && matchHistory.away_score !== null;
 
-            // Determine actual winner
-            let actualWinner: string;
-            if (matchHistory.home_score > matchHistory.away_score) {
-              actualWinner = matchHistory.home_team;
-            } else if (matchHistory.away_score > matchHistory.home_score) {
-              actualWinner = matchHistory.away_team;
-            } else {
-              actualWinner = 'Draw';
+          if (includePending || hasResult) {
+            let actualWinner: string | null = null;
+            let actualScore: string | null = null;
+            let isCorrect: boolean | null = null;
+
+            if (hasResult) {
+              // Determine actual winner
+              if (matchHistory.home_score > matchHistory.away_score) {
+                actualWinner = matchHistory.home_team;
+              } else if (matchHistory.away_score > matchHistory.home_score) {
+                actualWinner = matchHistory.away_team;
+              } else {
+                actualWinner = 'Draw';
+              }
+
+              // Check if prediction was correct
+              isCorrect = pred.prediction_winner === actualWinner;
+              actualScore = `${matchHistory.home_score}-${matchHistory.away_score}`;
             }
-
-            // Check if prediction was correct
-            const isCorrect = pred.prediction_winner === actualWinner;
 
             results.push({
               event_id: pred.event_id,
-              league: matchHistory.league || 'Soccer',
+              league: matchHistory?.league || 'Soccer',
               predicted_winner: pred.prediction_winner,
               actual_winner: actualWinner,
-              actual_score: `${matchHistory.home_score}-${matchHistory.away_score}`,
+              actual_score: actualScore,
               is_correct: isCorrect,
               prediction_text: pred.prediction_text,
               created_at: pred.created_at

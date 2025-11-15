@@ -500,22 +500,18 @@ export default function Page() {
   const loadPredictionForMatch = useCallback(async (ev: RawEvent) => {
     try {
       const isNBA = ev.league?.toLowerCase().includes('nba') || ev.league?.toLowerCase().includes('basketball');
+      const isSoccer = ev.league?.toLowerCase().includes('premier league') || ev.league?.toLowerCase().includes('english premier') || ev.league?.toLowerCase().includes('epl') || ev.league?.toLowerCase().includes('la liga') || ev.league?.toLowerCase().includes('laliga') || ev.league?.toLowerCase().includes('spanish');
       let predictionText = null;
-      if (isNBA) {
-        // Load from nba_predictions
-        const res = await fetch(`/api/analytics/predictions?nba=true`);
+      if (isNBA || isSoccer) {
+        // Load from predictions API (which checks respective tables)
+        const res = await fetch(`/api/predictions?eventId=${ev.id}`);
         const j = await res.json();
-        const pred = j.find((p: any) => String(p.event_id) === String(ev.id));
-        if (pred?.prediction_text) {
-          predictionText = pred.prediction_text;
+        if (j.ok && j.prediction) {
+          predictionText = j.prediction;
         }
       } else {
-        // Load from purchases
-        const res = await fetch(`/api/purchases?eventid=${ev.id}`);
-        const j = await res.json();
-        if (Array.isArray(j.purchases) && j.purchases[0]?.prediction) {
-          predictionText = j.purchases[0].prediction;
-        }
+        // For other leagues, predictions are not supported yet
+        predictionText = null;
       }
       if (predictionText) {
         setMatchPredictions(prev => ({
@@ -851,36 +847,19 @@ export default function Page() {
     if (!publicKey) { alert("Connect wallet first."); return; }
     try {
       const isNBA = ev.league?.toLowerCase().includes('nba') || ev.league?.toLowerCase().includes('basketball');
+      const isSoccer = ev.league?.toLowerCase().includes('premier league') || ev.league?.toLowerCase().includes('english premier') || ev.league?.toLowerCase().includes('epl') || ev.league?.toLowerCase().includes('la liga') || ev.league?.toLowerCase().includes('laliga') || ev.league?.toLowerCase().includes('spanish');
       let prediction = null;
 
-      if (isNBA) {
-        // For NBA, load from predictions API (which now checks nba_predictions table)
+      if (isNBA || isSoccer) {
+        // For NBA/Soccer, load from predictions API (which checks respective prediction tables)
         const res = await fetch(`/api/predictions?eventId=${ev.id}`);
         const j = await res.json();
         if (j.ok && j.prediction) {
           prediction = j.prediction;
         }
       } else {
-        // Load from purchases
-        const q = new URLSearchParams();
-        q.set("eventid", ev.id);
-        q.set("buyer", publicKey);
-        console.log(`[Debug] Looking for purchase: eventid=${ev.id}, buyer=${publicKey}`);
-        const res = await fetch(`/api/purchases?${q.toString()}`);
-        const j = await res.json();
-        console.log(`[Debug] Purchase lookup result:`, j);
-        let found = Array.isArray(j.purchases) && j.purchases[0];
-
-        // If not a buyer, allow viewing if match is finished
-        if (!found && ev.status && /finished|ft|final/i.test(String(ev.status))) {
-          // Get any prediction for this event (not just from this buyer)
-          const res2 = await fetch(`/api/purchases?eventid=${ev.id}`);
-          const j2 = await res2.json();
-          found = Array.isArray(j2.purchases) && j2.purchases[0];
-        }
-        if (found?.prediction) {
-          prediction = found.prediction;
-        }
+        // For other leagues, predictions are not supported yet
+        prediction = null;
       }
 
       if (!prediction) {
