@@ -35,7 +35,7 @@ export async function GET(req: Request) {
     
     // Check authorization header
     const authHeader = req.headers.get('Authorization') || req.headers.get('x-api-key');
-    const expectedKey = process.env.WORKER_API_KEY || 'test-key';
+    const expectedKey = process.env.WORKER_API_KEY || 'event-asu';
     
     if (authHeader !== `Bearer ${expectedKey}` && authHeader !== expectedKey) {
       console.warn('[Auto-Predict] Unauthorized access attempt');

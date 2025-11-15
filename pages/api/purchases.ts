@@ -17,10 +17,11 @@ async function generatePrediction(match: any) {
       `The narrative heading into this game favors ${predictedWinner}. Their recent adjustments have made them one of the most resilient teams in the league. ${losingTeam} will try to counter with aggressive play, but ${predictedWinner}'s experience and composure should prevail. This could be a statement win for ${predictedWinner}.`,
     ];
     const review = stories[Math.floor(Math.random() * stories.length)];
-    return `Prediction\n\n🏀 ${match.home} vs ${match.away}\nPredicted Score: ${homeScore}-${awayScore}\nTotal Score: ${totalScore}\nPredicted Winner: ${predictedWinner}\nConfidence: ${confidence}%\n\nReview:\n${review}\n\nGenerated: ${new Date().toLocaleString()}`.trim();
+    const text = `Prediction\n\n🏀 ${match.home} vs ${match.away}\nPredicted Score: ${homeScore}-${awayScore}\nTotal Score: ${totalScore}\nPredicted Winner: ${predictedWinner}\nConfidence: ${confidence}%\n\nReview:\n${review}\n\nGenerated: ${new Date().toLocaleString()}`.trim();
+    return { text, winner: predictedWinner, confidence };
   } catch (error) {
     console.error('Prediction generation failed:', error);
-    return 'Prediction generation failed. Please try again later.';
+    return { text: 'Prediction generation failed. Please try again later.', winner: '', confidence: 0 };
   }
 }
 
@@ -81,14 +82,52 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(409).json({ error: 'Already purchased this event by this wallet' });
       }
     let finalPrediction = prediction;
+    // Fetch match to check league
+    const origin = req.headers['origin'] || `http://${req.headers['host']}`;
+    const matchRes = await fetch(`${origin}/api/matches`);
+    const matchData = await matchRes.json();
+    const match = matchData.events?.find((e: any) => String(e.id) === String(eventid));
+    const isNBA = match ? (match.league?.toLowerCase().includes('nba') || match.league?.toLowerCase().includes('basketball')) : false;
+    console.log('[API] Match league:', match?.league, 'isNBA:', isNBA, 'eventid:', eventid);
+
     if (!finalPrediction) {
-      // You may need to adjust the fetch URL for your environment
-      const origin = req.headers['origin'] || `http://${req.headers['host']}`;
-      const matchRes = await fetch(`${origin}/api/matches`);
-      const matchData = await matchRes.json();
-            const match = matchData.events?.find((e: any) => String(e.id) === String(eventid));
       if (match) {
-        finalPrediction = await generatePrediction(match);
+        if (isNBA) {
+          // Check if prediction exists in nba_predictions
+          const { data: existingPred, error: predError } = await supabase
+            .from('nba_predictions')
+            .select('prediction_text')
+            .eq('event_id', eventid)
+            .single();
+          console.log('[API] NBA check result:', { existingPred, predError });
+          if (!predError && existingPred) {
+            finalPrediction = existingPred.prediction_text;
+            console.log('[API] Using existing NBA prediction');
+          } else {
+            // Generate and store
+            console.log('[API] Generating new NBA prediction');
+            const predData = await generatePrediction(match);
+            finalPrediction = predData.text;
+            // Store in nba_predictions
+            const { error: insertPredError } = await supabase.from('nba_predictions').upsert([{
+              event_id: eventid,
+              prediction_winner: predData.winner,
+              prediction_time: new Date().toISOString(),
+              status: 'pending',
+              prediction_text: predData.text,
+              created_at: new Date().toISOString(),
+            }], { onConflict: 'event_id' });
+            if (insertPredError) {
+              console.error('[API] Failed to store NBA prediction:', insertPredError.message);
+            } else {
+              console.log('[API] Stored NBA prediction');
+            }
+          }
+        } else {
+          // Soccer or other, generate per purchase
+          console.log('[API] Generating soccer prediction');
+          finalPrediction = (await generatePrediction(match)).text;
+        }
       } else {
         finalPrediction = 'Match details not found. Prediction unavailable.';
       }
@@ -99,7 +138,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         txid: txid ?? null,
         amount: amount ?? null,
         token: token ?? null,
-        prediction: finalPrediction,
+        prediction: isNBA ? null : finalPrediction, // Don't store prediction for NBA in purchases
         timestamp: new Date().toISOString(),
       };
       const { error: insertError } = await supabase.from('purchases').insert([rec]);

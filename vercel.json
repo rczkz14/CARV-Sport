@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/worker/auto-select-nba",
-      "schedule": "0 4 * * *"
+      "schedule": "0 4-16/3 * * *"
     },
     {
       "path": "/api/worker/auto-select-soccer",

@@ -45,7 +45,7 @@ export async function POST(req: Request) {
       }, { status: 500 });
     }
 
-    console.log(`[NBA Window Close] Found ${selectedMatches?.length || 0} selected NBA matches for ${d1DateStr}`);
+    console.log(`[NBA Window Close] Found ${selectedMatches?.length || 0} selected NBA matches for ${wibDateStr}`);
 
     if (!selectedMatches || selectedMatches.length === 0) {
       return NextResponse.json({
@@ -164,13 +164,13 @@ export async function POST(req: Request) {
 
     // Find today's window (based on NBA window dates)
     const now = new Date();
-    const wibDate = new Date(now.getTime() + 7 * 60 * 60 * 1000); // WIB = UTC + 7 hours
-    const wibDateStr = wibDate.toISOString().split('T')[0]; // YYYY-MM-DD in WIB
+    const wibDate2 = new Date(now.getTime() + 7 * 60 * 60 * 1000); // WIB = UTC + 7 hours
+    const wibDateStr2 = wibDate2.toISOString().split('T')[0]; // YYYY-MM-DD in WIB
 
-    let windowEntry = windowDates.find((w: any) => w.date === wibDateStr && w.league === 'NBA');
+    let windowEntry = windowDates.find((w: any) => w.date === wibDateStr2 && w.league === 'NBA');
     if (!windowEntry) {
       windowEntry = {
-        date: wibDateStr,
+        date: wibDateStr2,
         league: 'NBA',
         nba: selectedMatches.map((s: any) => s.event_id),
         epl: [],

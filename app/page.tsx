@@ -497,18 +497,34 @@ export default function Page() {
     }
   }, []);
 
-  const loadPredictionForMatch = useCallback(async (eventid: string) => {
+  const loadPredictionForMatch = useCallback(async (ev: RawEvent) => {
     try {
-      const res = await fetch(`/api/purchases?eventid=${eventid}`);
-      const j = await res.json();
-      if (Array.isArray(j.purchases) && j.purchases[0]?.prediction) {
+      const isNBA = ev.league?.toLowerCase().includes('nba') || ev.league?.toLowerCase().includes('basketball');
+      let predictionText = null;
+      if (isNBA) {
+        // Load from nba_predictions
+        const res = await fetch(`/api/analytics/predictions?nba=true`);
+        const j = await res.json();
+        const pred = j.find((p: any) => String(p.event_id) === String(ev.id));
+        if (pred?.prediction_text) {
+          predictionText = pred.prediction_text;
+        }
+      } else {
+        // Load from purchases
+        const res = await fetch(`/api/purchases?eventid=${ev.id}`);
+        const j = await res.json();
+        if (Array.isArray(j.purchases) && j.purchases[0]?.prediction) {
+          predictionText = j.purchases[0].prediction;
+        }
+      }
+      if (predictionText) {
         setMatchPredictions(prev => ({
           ...prev,
-          [eventid]: j.purchases[0].prediction
+          [ev.id]: predictionText
         }));
       }
     } catch (e) {
-      console.error("Failed to load prediction for", eventid, e);
+      console.error("Failed to load prediction for", ev.id, e);
     }
   }, []);
 
@@ -565,7 +581,7 @@ export default function Page() {
       const finishedMatches = events.filter(ev => ev.status && /finished|final|ft/i.test(ev.status));
       finishedMatches.forEach(ev => {
         if (!matchPredictions[ev.id]) {
-          loadPredictionForMatch(ev.id);
+          loadPredictionForMatch(ev);
         }
         // Load prediction result (actualWinner, isCorrect)
         if (!predictionResults[ev.id]) {
@@ -575,34 +591,15 @@ export default function Page() {
     }
   }, [events, showHistory, matchPredictions, loadPredictionForMatch, predictionResults]);
 
-  // Handle video looping
+  // Handle video autoplay
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    const handleEnded = () => {
-      console.log('Video ended, restarting...');
-      video.currentTime = 0;
-      video.play().catch((err: any) => console.log('Video play error:', err));
-    };
-
-    const handleCanPlay = () => {
-      console.log('Video can play');
-      video.play().catch((err: any) => console.log('Autoplay error:', err));
-    };
-
-    video.addEventListener('ended', handleEnded);
-    video.addEventListener('canplay', handleCanPlay);
-
-    // Try to play on mount
+    // Try to play on mount when NBA is selected
     if (leagueFilter === "NBA") {
-      video.play().catch((err: any) => console.log('Initial play error:', err));
+      video.play().catch((err: any) => console.log('Video autoplay error:', err));
     }
-
-    return () => {
-      video.removeEventListener('ended', handleEnded);
-      video.removeEventListener('canplay', handleCanPlay);
-    };
   }, [leagueFilter]);
 
   function toTokenAmountRaw(amountDecimal: number, decimals: number) {
@@ -853,34 +850,47 @@ export default function Page() {
   const handleViewPrediction = async (ev: RawEvent) => {
     if (!publicKey) { alert("Connect wallet first."); return; }
     try {
-      const q = new URLSearchParams();
-      q.set("eventid", ev.id);
-      q.set("buyer", publicKey);
-      console.log(`[Debug] Looking for purchase: eventid=${ev.id}, buyer=${publicKey}`);
-      const res = await fetch(`/api/purchases?${q.toString()}`);
-      const j = await res.json();
-      console.log(`[Debug] Purchase lookup result:`, j);
-      let found = Array.isArray(j.purchases) && j.purchases[0];
-      
-      // If not a buyer, allow viewing if match is finished
-      if (!found && ev.status && /finished|ft|final/i.test(String(ev.status))) {
-        // Get any prediction for this event (not just from this buyer)
-        const res2 = await fetch(`/api/purchases?eventid=${ev.id}`);
-        const j2 = await res2.json();
-        found = Array.isArray(j2.purchases) && j2.purchases[0];
-        if (!found) { alert("No prediction available for this match yet."); return; }
-      } else if (!found) { 
-        // Show debugging info before alerting
-        console.log(`[Debug] No purchase found. Available purchases for this event:`, 
-                   j.purchases || 'none');
-        alert(`Purchase record not found. Match must be finished to view predictions.\n\nDebug: eventid=${ev.id}, buyer=${publicKey}`); 
-        return; 
+      const isNBA = ev.league?.toLowerCase().includes('nba') || ev.league?.toLowerCase().includes('basketball');
+      let prediction = null;
+
+      if (isNBA) {
+        // For NBA, load from predictions API (which now checks nba_predictions table)
+        const res = await fetch(`/api/predictions?eventId=${ev.id}`);
+        const j = await res.json();
+        if (j.ok && j.prediction) {
+          prediction = j.prediction;
+        }
+      } else {
+        // Load from purchases
+        const q = new URLSearchParams();
+        q.set("eventid", ev.id);
+        q.set("buyer", publicKey);
+        console.log(`[Debug] Looking for purchase: eventid=${ev.id}, buyer=${publicKey}`);
+        const res = await fetch(`/api/purchases?${q.toString()}`);
+        const j = await res.json();
+        console.log(`[Debug] Purchase lookup result:`, j);
+        let found = Array.isArray(j.purchases) && j.purchases[0];
+
+        // If not a buyer, allow viewing if match is finished
+        if (!found && ev.status && /finished|ft|final/i.test(String(ev.status))) {
+          // Get any prediction for this event (not just from this buyer)
+          const res2 = await fetch(`/api/purchases?eventid=${ev.id}`);
+          const j2 = await res2.json();
+          found = Array.isArray(j2.purchases) && j2.purchases[0];
+        }
+        if (found?.prediction) {
+          prediction = found.prediction;
+        }
       }
-      
+
+      if (!prediction) {
+        alert("No prediction available for this match yet.");
+        return;
+      }
+
       setCurrentMatch({ home: ev.home, away: ev.away });
-      
+
       // Parse the prediction data
-      const prediction = found.prediction;
       const lines = prediction.split('\n');
       setPredictionDetails({
         predictedScore: lines.find((l: string) => l.includes('Predicted Score'))?.split(':')[1]?.trim() ?? '',
@@ -894,7 +904,7 @@ export default function Page() {
       const reviewStart = prediction.indexOf('Review:');
       const reviewEnd = prediction.indexOf('Generated:');
       setCurrentPredictionText(prediction.slice(reviewStart + 7, reviewEnd).trim());
-      
+
       setPredictionModalOpen(true);
     } catch (e) {
       console.error("view prediction", e);
@@ -928,7 +938,7 @@ export default function Page() {
     setShowHistory(true);
     setSearchQuery(""); // Clear search query when opening history
     setCurrentPage(1); // Reset to first page
-    fetchMatches({ closedWindow: true });
+    fetchMatches({ history: true }); // FIXED: always fetch history
   };
 
   const backToLeagueSelection = () => {
@@ -936,7 +946,7 @@ export default function Page() {
     setShowHistory(true);
     setSearchQuery(""); // Clear search query when going back
     setCurrentPage(1); // Reset to first page
-    fetchMatches({ history: false });
+    fetchMatches({ history: true });
   };
 
   if (isMobile) {
@@ -972,6 +982,7 @@ export default function Page() {
         }}>
           <video
             key={`video-${leagueFilter}`}
+            ref={videoRef}
             autoPlay
             muted
             loop
@@ -1257,8 +1268,8 @@ export default function Page() {
                   const filteredEvents = events
                     .filter(ev => {
                       if (leagueFilter === "NBA") return /nba/i.test(ev.league ?? "");
-                      if (leagueFilter === "EPL") return /premier league|english premier|epl/i.test(ev.league ?? "");
-                      if (leagueFilter === "LaLiga") return /laliga|la liga/i.test(ev.league ?? "");
+                      if (leagueFilter === "EPL") return /premier league|english premier|epl/i.test(ev.league ?? "") || /soccer|football/i.test(ev.league ?? "");
+                      if (leagueFilter === "LaLiga") return /laliga|la liga/i.test(ev.league ?? "") || /spanish|la\s+liga/i.test(ev.league ?? "");
                       return true;
                     })
                     // Show matches if not started, regardless of window status
@@ -1433,16 +1444,21 @@ export default function Page() {
                     if (leagueFilter === "LaLiga") return /laliga|la liga/i.test(ev.league ?? "") || /spanish|la\s+liga/i.test(ev.league ?? "");
                     return true;
                   })
-                  // Show matches in history if match is started or finished
+                  // REMOVE status/start filter: show all history events
+                  // .filter(ev => {
+                  //   const isStarted = isMatchStarted(ev);
+                  //   const isFinished = ev.status && /finished|final|ft/i.test(ev.status);
+                  //   if (!isStarted && !isFinished) return false;
+                  //   return true;
+                  // })
                   .filter(ev => {
-                    const isStarted = isMatchStarted(ev);
-                    const isFinished = ev.status && /finished|final|ft/i.test(ev.status);
-                    if (!isStarted && !isFinished) return false;
-                    const query = searchQuery.toLowerCase();
+                    // Apply search filter only
+                    if (!searchQuery) return true;
+                    const q = searchQuery.toLowerCase();
                     return (
-                      ev.id.toLowerCase().includes(query) ||
-                      ev.home.toLowerCase().includes(query) ||
-                      ev.away.toLowerCase().includes(query)
+                      ev.home?.toLowerCase().includes(q) ||
+                      ev.away?.toLowerCase().includes(q) ||
+                      String(ev.id).includes(q)
                     );
                   })
                   // Sort by datetime (newest/latest first)
@@ -1537,7 +1553,7 @@ export default function Page() {
 
                                   <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
                                     <span>👥</span>
-                                    <span>{buyerCounts[ev.id] ?? 0} buyer{(buyerCounts[ev.id] ?? 0) !== 1 ? 's' : ''}</span>
+                                    <span>{(buyerCounts[ev.id] ?? 0) + ' buyer' + ((buyerCounts[ev.id] ?? 0) !== 1 ? 's' : '')}</span>
                                   </div>
                                 </div>
 
