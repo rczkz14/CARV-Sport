@@ -28,13 +28,14 @@ export async function POST(req: Request) {
 
     // Get selected matches for the current D+1 date from nba_matches_pending
     const nowUtc = new Date();
-    const d1Date = new Date(nowUtc.getTime() + 7 * 60 * 60 * 1000); // WIB = UTC + 7
-    const d1DateStr = d1Date.toISOString().split('T')[0]; // YYYY-MM-DD in WIB
+    const wibDate = new Date(nowUtc.getTime() + 7 * 60 * 60 * 1000); // WIB = UTC + 7
+    const wibDateStr = wibDate.toISOString().split('T')[0]; // YYYY-MM-DD in WIB
 
+    // Only select matches with wib_time equal to today's WIB date
     const { data: selectedMatches, error: selectError } = await supabase
       .from('nba_matches_pending')
       .select('*')
-      .eq('selected_for_date', d1DateStr);
+      .eq('wib_time', wibDateStr);
 
     if (selectError) {
       console.error('[NBA Window Close] Error fetching selected matches:', selectError.message);

@@ -6,16 +6,23 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 async function moveMatchesToHistory() {
-  // Fetch all pending NBA matches
+  // Get today's date in YYYY-MM-DD (WIB)
+  const now = new Date();
+  const wibOffsetMs = 7 * 60 * 60 * 1000;
+  const wibDate = new Date(now.getTime() + wibOffsetMs);
+  const wibDateStr = wibDate.toISOString().slice(0, 10); // YYYY-MM-DD
+
+  // Fetch only pending NBA matches for today's WIB date
   const { data: pendingMatches, error } = await supabase
     .from('nba_matches_pending')
-    .select('*');
+    .select('*')
+    .eq('wib_time', wibDateStr);
   if (error) {
     console.error('Error fetching pending matches:', error.message);
     return;
   }
   if (!pendingMatches || pendingMatches.length === 0) {
-    console.log('No pending NBA matches to move.');
+    console.log('No pending NBA matches to move for WIB date', wibDateStr);
     return;
   }
 
@@ -31,6 +38,7 @@ async function moveMatchesToHistory() {
     created_at: match.created_at,
     home_score: match.home_score || null,
     away_score: match.away_score || null,
+    wib_time: match.wib_time,
   }));
 
   // Insert into history table
@@ -53,7 +61,7 @@ async function moveMatchesToHistory() {
     return;
   }
 
-  console.log(`Moved ${pendingMatches.length} NBA matches to history with status 'waiting for result'.`);
+  console.log(`Moved ${pendingMatches.length} NBA matches to history for WIB date ${wibDateStr} with status 'waiting for result'.`);
 }
 
 moveMatchesToHistory();

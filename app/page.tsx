@@ -1515,16 +1515,15 @@ export default function Page() {
                                       </div>
                                     )}
                                   </div>
-                                  {ev.status && (
-                                    <div className="mt-2">
-                                      <span className={`text-sm px-2 py-1 rounded ${/finished|final|ft/i.test(predictionResults[ev.id]?.status || ev.status) ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
-                                        {predictionResults[ev.id]?.status || ev.status}
-                                      </span>
-                                    </div>
-                                  )}
 
                                   <div className="mt-1 text-sm opacity-90">
-                                    <span className="mr-2">Status: <strong>{predictionResults[ev.id]?.status || ev.status || 'N/A'}</strong></span>
+                                    {((predictionResults[ev.id]?.status || ev.status)?.toLowerCase() === 'waiting for result') ? (
+                                      <span className="px-2 py-1 rounded bg-yellow-500/20 text-yellow-400 font-semibold mr-2">
+                                        Status: Waiting for Result
+                                      </span>
+                                    ) : (
+                                      <span className="mr-2">Status: <strong>{predictionResults[ev.id]?.status || ev.status || 'N/A'}</strong></span>
+                                    )}
                                     <div>Match ID: <strong>{ev.id}</strong></div>
                                   </div>
 

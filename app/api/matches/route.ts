@@ -231,9 +231,7 @@ export async function GET(req: Request) {
       // Fetch NBA matches
       const nbaTable = isHistory ? 'nba_matches_history' : 'nba_matches_pending';
       let nbaQuery = supabase.from(nbaTable).select('*');
-      if (isHistory) {
-        nbaQuery = nbaQuery.or('status.ilike.%finished%,status.ilike.%final%,status.ilike.%ft%,status.ilike.%completed%,status.ilike.%FT%,status.ilike.%Waiting for Result%').or('home_score.not.is.null,away_score.not.is.null');
-      }
+      // For NBA history, always return all rows from Supabase, no filter
       const { data: nbaData, error: nbaError } = await nbaQuery;
       if (!nbaError && Array.isArray(nbaData)) {
         const nbaMatches = nbaData.map((e: any) => ({
