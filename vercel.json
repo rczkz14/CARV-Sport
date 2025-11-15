@@ -1,0 +1,32 @@
+{
+  "crons": [
+    {
+      "path": "/api/worker/nba-window-close",
+      "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/api/worker/auto-select-nba",
+      "schedule": "0 4-16/3 * * *"
+    },
+    {
+      "path": "/api/worker/auto-select-soccer",
+      "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/worker/auto-predict-nba",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/worker/auto-predict-soccer",
+      "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/worker/auto-raffle",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/predictions/update-results",
+      "schedule": "0 */4 * * *"
+    }
+  ]
+}
