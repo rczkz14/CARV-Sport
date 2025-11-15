@@ -22,7 +22,7 @@ const WINDOW_DATES_FILE = path.join(process.cwd(), 'data/window_dates.json');
  * Archive NBA matches from locked selection to history
  * when the window closes at 04:00 AM WIB
  */
-export async function POST(req: Request) {
+export async function GET(req: Request) {
   try {
     console.log('[NBA Window Close] Starting NBA window close archival...');
 
