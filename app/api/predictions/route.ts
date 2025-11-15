@@ -12,43 +12,39 @@ export async function GET(req: Request) {
     const eventId = url.searchParams.get("eventId");
     if (!eventId) return NextResponse.json({ ok: false, error: "Missing eventId" }, { status: 400 });
 
-    // First, check if this is an NBA or Soccer match by fetching match details
-    const matchRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/matches`);
-    const matchData = await matchRes.json();
-    const match = matchData.events?.find((e: any) => String(e.id) === String(eventId));
-    const isNBA = match ? (match.league?.toLowerCase().includes('nba') || match.league?.toLowerCase().includes('basketball')) : false;
-    const isSoccer = match ? (match.league?.toLowerCase().includes('premier league') || match.league?.toLowerCase().includes('english premier') || match.league?.toLowerCase().includes('epl') || match.league?.toLowerCase().includes('la liga') || match.league?.toLowerCase().includes('laliga') || match.league?.toLowerCase().includes('spanish')) : false;
-
     let prediction = null;
 
-    if (isNBA) {
-      // For NBA, fetch from nba_predictions table
-      const { data: nbaPred, error } = await supabase
-        .from('nba_predictions')
-        .select('prediction_text')
-        .eq('event_id', eventId)
-        .single();
+    // First try NBA predictions table
+    const { data: nbaPred, error: nbaError } = await supabase
+      .from('nba_predictions')
+      .select('prediction_text')
+      .eq('event_id', eventId)
+      .single();
 
-      if (!error && nbaPred) {
-        prediction = nbaPred.prediction_text;
-      }
-    } else if (isSoccer) {
-      // For Soccer, fetch from soccer_predictions table
-      const { data: soccerPred, error } = await supabase
+    if (!nbaError && nbaPred) {
+      prediction = nbaPred.prediction_text;
+    } else {
+      // Try soccer predictions table
+      const { data: soccerPred, error: soccerError } = await supabase
         .from('soccer_predictions')
         .select('prediction_text')
         .eq('event_id', eventId)
         .single();
 
-      if (!error && soccerPred) {
+      if (!soccerError && soccerPred) {
         prediction = soccerPred.prediction_text;
+      } else {
+        // Fallback to JSON file for other leagues
+        try {
+          const file = path.join(DATA_DIR, "predictions.json");
+          const raw = await fs.readFile(file, "utf8");
+          const map = JSON.parse(raw || "{}");
+          prediction = map[eventId] ?? null;
+        } catch (e) {
+          // JSON file doesn't exist or can't be read
+          prediction = null;
+        }
       }
-    } else {
-      // For other leagues, check the JSON file
-      const file = path.join(DATA_DIR, "predictions.json");
-      const raw = await fs.readFile(file, "utf8");
-      const map = JSON.parse(raw || "{}");
-      prediction = map[eventId] ?? null;
     }
 
     return NextResponse.json({ ok: true, eventId, prediction });
