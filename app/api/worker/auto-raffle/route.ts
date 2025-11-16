@@ -8,19 +8,24 @@ import { NextResponse } from "next/server";
 import { supabase } from "../../../../lib/supabaseClient";
 
 async function processRaffles(historyTable: string, raffleTable: string, league: string) {
-  // Query FT matches from history table
-  const { data: ftMatches, error: matchesError } = await supabase
+  // Query all matches from history table and filter for finished ones
+  const { data: allMatches, error: matchesError } = await supabase
     .from(historyTable)
-    .select('*')
-    .eq('status', 'FT');
+    .select('*');
 
   if (matchesError) {
     console.error(`[Auto-Raffle ${league}] Matches query error:`, matchesError);
     return { processedCount: 0, matches: [] };
   }
 
+  // Filter for finished matches
+  const ftMatches = (allMatches || []).filter(match => {
+    const status = String(match.status || '').replace(/\s+/g, '').toLowerCase();
+    return status.includes('final') || status === 'ft';
+  });
+
   if (!ftMatches || ftMatches.length === 0) {
-    console.log(`[Auto-Raffle ${league}] No FT matches to process`);
+    console.log(`[Auto-Raffle ${league}] No finished matches to process`);
     return { processedCount: 0, matches: [] };
   }
 
@@ -46,7 +51,7 @@ async function processRaffles(historyTable: string, raffleTable: string, league:
     const { data: purchases, error: purchasesError } = await supabase
       .from('purchases')
       .select('buyer')
-      .eq('event_id', eventId);
+      .eq('eventid', eventId);
 
     if (purchasesError) {
       console.error(`[Auto-Raffle ${league}] Purchases query error for ${eventId}:`, purchasesError);

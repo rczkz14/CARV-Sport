@@ -32,8 +32,9 @@ export async function GET(req: Request) {
             .eq('event_id', pred.event_id)
             .single();
 
-          const hasResult = !historyError && matchHistory && matchHistory.status === 'FT' &&
-              matchHistory.home_score !== null && matchHistory.away_score !== null;
+          const hasResult = !historyError && matchHistory &&
+            (String(matchHistory.status).toLowerCase() === 'ft' || String(matchHistory.status).toLowerCase() === 'final') &&
+            matchHistory.home_score !== null && matchHistory.away_score !== null;
 
           if (includePending || hasResult) {
             let actualWinner: string | null = null;

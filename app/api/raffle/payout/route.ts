@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     const { data: purchases, error: purchasesError } = await supabase
       .from('purchases')
       .select('*')
-      .eq('event_id', eventId);
+      .eq('eventid', eventId);
 
     if (purchasesError) {
       console.error('Purchases query error:', purchasesError);
@@ -163,22 +163,14 @@ export async function POST(request: Request) {
       txHash
     };
 
-    // Insert to Supabase raffles table
-    const raffleRecord = {
-      id: rec.id,
-      event_id: rec.eventId,
-      winner: rec.winners[0],
-      buyer_count: rec.buyerCount,
-      prize_pool: rec.prizePool,
-      winner_payout: rec.winnerPayout,
-      tx_hash: rec.txHash,
-      created_at: rec.createdAt,
-      token: rec.token
-    };
+    // Update existing raffle record with tx_hash
+    const { error: updateError } = await supabase
+      .from('nba_raffle')
+      .update({ tx_hash: rec.txHash })
+      .eq('event_id', rec.eventId);
 
-    const { error: insertError } = await supabase.from('nba_raffle').insert(raffleRecord);
-    if (insertError) {
-      console.error('Raffle insert error:', insertError);
+    if (updateError) {
+      console.error('Raffle update error:', updateError);
       // Continue, as payout is done
     }
 

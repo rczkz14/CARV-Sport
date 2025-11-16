@@ -26,6 +26,13 @@ async function fetchWithRetry(url, retries = 3) {
 }
 
 async function fetchNBAMatchesForToday() {
+  // --- PATCH: Filter for specific WIB date ---
+  // Set your target WIB date here (e.g., 17 Nov)
+  const targetDay = 17; // day of month
+  const targetMonth = 10; // November (0-based: Jan=0)
+  const targetYear = 2025; // set year if needed, or use current year
+  const WIB_OFFSET = 7 * 60 * 60 * 1000;
+
   // Get today's date in UTC (SportDB expects UTC)
   const now = new Date();
   const utcYear = now.getUTCFullYear();
@@ -37,12 +44,23 @@ async function fetchNBAMatchesForToday() {
   const nbaDaily = await fetchWithRetry(`${BASE}/eventsday.php?d=${dateStr}&s=Basketball&l=NBA`);
   let matches = nbaDaily?.events || [];
 
+  // Only keep matches where WIB date matches target
+  matches = matches.filter(m => {
+    if (!m.strTimestamp) return false;
+    const utcDateObj = new Date(m.strTimestamp);
+    const wibDateObj = new Date(utcDateObj.getTime() + WIB_OFFSET);
+    return (
+      wibDateObj.getDate() === targetDay &&
+      wibDateObj.getMonth() === targetMonth &&
+      wibDateObj.getFullYear() === targetYear
+    );
+  });
   // Filter to max 5, min 1
   if (matches.length > 5) {
     matches = matches.slice(0, 5);
   }
   if (matches.length < 1) {
-    console.warn('No NBA matches found for today!');
+    console.warn('No NBA matches found for target WIB date!');
     matches = [];
   }
 

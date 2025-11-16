@@ -1,47 +1,10 @@
-import path from "path";
 import { NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import { supabase } from "../../../lib/supabaseClient";
-import { promises as fs } from "fs";
-
-const DATA_DIR = path.resolve(process.cwd(), "data");
-const PURCHASES_FILE = path.join(DATA_DIR, "purchases.json");
-const API_FETCH_FILE = path.join(DATA_DIR, "api_fetch.json");
-const WINDOW_HISTORY_FILE = path.join(DATA_DIR, "window_history.json");
 
 function pickRandom<T>(arr: T[]) {
   if (!Array.isArray(arr) || arr.length === 0) return null;
   return arr[Math.floor(Math.random() * arr.length)];
-}
-
-function getMatchDetailsFromFetch(eventid: string, apiFetchData: any): { home: string; away: string; league: string } | null {
-  try {
-    // Look in NBA data
-    const nbaMatch = apiFetchData?.nba?.daily?.find((m: any) => String(m.idEvent) === String(eventid));
-    if (nbaMatch) {
-      return {
-        home: nbaMatch.strHomeTeam,
-        away: nbaMatch.strAwayTeam,
-        league: "NBA"
-      };
-    }
-
-    // Look in EPL data
-    const eplMatch = apiFetchData?.epl?.league?.find((m: any) => String(m.idEvent) === String(eventid)) || 
-            apiFetchData?.epl?.daily?.find((m: any) => String(m.idEvent) === String(eventid));
-    if (eplMatch) {
-      return {
-        home: eplMatch.strHomeTeam,
-        away: eplMatch.strAwayTeam,
-        league: "EPL"
-      };
-    }
-
-    return null;
-  } catch (e) {
-    console.error("Error getting match details:", e);
-    return null;
-  }
 }
 
 interface RaffleResult {
@@ -65,80 +28,73 @@ export async function GET(request: Request) {
     const page = parseInt(url.searchParams.get('page') || '1');
     const limit = parseInt(url.searchParams.get('limit') || '10');
 
-    // If eventId is specified, return just that raffle
+    // If eventId is specified, return prediction correctness and match details from Supabase only
     if (eventid) {
-      // Try NBA first
-      let raffle = null;
-      let matchTable = 'nba_matches_history';
-      let league = 'NBA';
-
-      const { data: nbaRaffle, error: nbaError } = await supabase
-        .from('nba_raffle')
-        .select('*')
+      // Try NBA
+      let matchDetails = null;
+      let predictedWinner = null;
+      let isCorrect = null;
+      let actualWinner = null;
+      // Get match details and winner
+      const { data: matchData } = await supabase
+        .from('nba_matches_history')
+        .select('home_team, away_team, winner, home_score, away_score, status')
         .eq('event_id', eventid)
         .single();
-
-      if (nbaRaffle) {
-        raffle = nbaRaffle;
-      } else {
-        // Try EPL
-        const { data: eplRaffle, error: eplError } = await supabase
-          .from('epl_raffle')
-          .select('*')
-          .eq('event_id', eventid)
-          .single();
-
-        if (eplRaffle) {
-          raffle = eplRaffle;
-          matchTable = 'epl_matches_history';
-          league = 'EPL';
-        } else {
-          // Try La Liga
-          const { data: laligaRaffle, error: laligaError } = await supabase
-            .from('laliga_raffle')
-            .select('*')
-            .eq('event_id', eventid)
-            .single();
-
-          if (laligaRaffle) {
-            raffle = laligaRaffle;
-            matchTable = 'laliga_matches_history';
-            league = 'La Liga';
+      if (matchData) {
+        matchDetails = {
+          home: matchData.home_team,
+          away: matchData.away_team,
+          league: 'NBA',
+          homeScore: matchData.home_score,
+          awayScore: matchData.away_score,
+          status: matchData.status
+        };
+        // Compute actual winner if missing
+        if (matchData.winner) {
+          actualWinner = matchData.winner;
+        } else if (
+          (matchData.status && ["FT", "final"].includes(matchData.status.toLowerCase())) &&
+          typeof matchData.home_score === "number" && typeof matchData.away_score === "number"
+        ) {
+          if (matchData.home_score > matchData.away_score) {
+            actualWinner = matchData.home_team;
+          } else if (matchData.away_score > matchData.home_score) {
+            actualWinner = matchData.away_team;
+          } else {
+            actualWinner = "Draw";
           }
         }
+      } else {
+        matchDetails = {
+          home: "Unknown Team",
+          away: "Unknown Team",
+          league: 'NBA'
+        };
       }
-
-      if (!raffle) {
-        return NextResponse.json({ ok: false, raffle: null }, { status: 404 });
-      }
-
-      // Get match details
-      const { data: match } = await supabase
-        .from(matchTable)
-        .select('strHomeTeam, strAwayTeam')
-        .eq('idEvent', eventid)
+      // Get prediction winner
+      const { data: nbaPred } = await supabase
+        .from('nba_predictions')
+        .select('prediction_text')
+        .eq('event_id', eventid)
         .single();
-
-      const matchDetails = match ? {
-        home: match.strHomeTeam,
-        away: match.strAwayTeam,
-        league
-      } : {
-        home: "Unknown Team",
-        away: "Unknown Team",
-        league
-      };
-
+      if (nbaPred && nbaPred.prediction_text) {
+        const lines = nbaPred.prediction_text.split('\n');
+        const winnerLine = lines.find((l: string) => l.toLowerCase().includes('predicted winner'));
+        if (winnerLine) {
+          predictedWinner = winnerLine.split(':')[1]?.trim();
+        }
+      }
+      if (predictedWinner && actualWinner) {
+        isCorrect = predictedWinner.toLowerCase() === String(actualWinner).toLowerCase();
+      }
       return NextResponse.json({
         ok: true,
-        raffle: {
-          ...raffle,
+        result: {
           matchDetails,
-          winner: raffle.winner,
-          prize: raffle.winner_payout,
-          timestamp: raffle.created_at,
-          participantCount: raffle.buyer_count,
-          txHash: raffle.tx_hash
+          predictedWinner,
+          actualWinner,
+          isCorrect
         }
       });
     }
@@ -172,11 +128,11 @@ export async function GET(request: Request) {
     // Enrich with match details
     const enrichedRaffles = [];
     for (const raffle of paginatedRaffles) {
-      const { data: match } = await supabase
-        .from(raffle.matchTable)
-        .select('strHomeTeam, strAwayTeam')
-        .eq('idEvent', raffle.event_id)
-        .single();
+        const { data: match } = await supabase
+          .from(raffle.matchTable)
+          .select('strHomeTeam, strAwayTeam')
+          .eq('event_id', raffle.event_id)
+          .single();
 
       const matchDetails = match ? {
         home: match.strHomeTeam,
@@ -240,17 +196,18 @@ export async function POST(request: Request) {
     // Verify the match is actually finished
     const { data: match } = await supabase
       .from('nba_matches_history')
-      .select('*')
-      .eq('idEvent', eventid)
+      .select('event_id, home_team, away_team, status, event_date')
+      .eq('event_id', eventid)
       .single();
 
     if (!match) {
       return NextResponse.json({ error: "match not found" }, { status: 404 });
     }
 
-    if (match.strStatus !== 'FT') {
+    const status = String(match.status || '').replace(/\s+/g, '').toLowerCase();
+    if (!(status.includes('final') || status === 'ft')) {
       return NextResponse.json({
-        error: "match is not finished yet (not FT status)"
+        error: "match is not finished yet (not FT/final status)"
       }, { status: 400 });
     }
 
@@ -258,7 +215,7 @@ export async function POST(request: Request) {
     const { data: purchases, error: purchasesError } = await supabase
       .from('purchases')
       .select('*')
-      .eq('event_id', eventid);
+      .eq('eventid', eventid);
 
     if (purchasesError) {
       console.error('Purchases query error:', purchasesError);
@@ -302,18 +259,18 @@ export async function POST(request: Request) {
     };
 
     // Insert to raffles table
+    // Convert event_date to YYYY-MM-DD string for match_date
     const raffleRecord = {
-      id: rec.id,
       event_id: rec.eventid,
       winner: rec.winners[0],
-      buyer_count: rec.buyerCount,
-      prize_pool: rec.prizePool,
-      winner_payout: rec.winnerPayout,
-      created_at: rec.createdAt,
-      token: rec.token,
-      home_team: match.strHomeTeam,
-      away_team: match.strAwayTeam,
-      match_date: match.dateEvent
+      buyer_count: Number(rec.buyerCount),
+      prize_pool: Number(rec.prizePool),
+      winner_payout: Number(rec.winnerPayout),
+      tx_hash: "", // or actual tx hash if available
+      token: rec.token || "CARV",
+      league: "NBA",
+      home_team: match.home_team,
+      away_team: match.away_team
     };
 
     const { error: insertError } = await supabase.from('nba_raffle').insert(raffleRecord);
@@ -322,12 +279,39 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Database insert error" }, { status: 500 });
     }
 
+    // Trigger payout
+    let txHash = "";
+    try {
+      const payoutResponse = await fetch(`http://localhost:3000/api/raffle/payout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventId: eventid,
+          winner: rec.winners[0],
+          winnersCount: 1,
+          token: rec.token
+        })
+      });
+
+      if (payoutResponse.ok) {
+        const payoutData = await payoutResponse.json();
+        txHash = payoutData.result?.txHash || "";
+      } else {
+        console.error('Payout failed:', await payoutResponse.text());
+      }
+    } catch (payoutErr) {
+      console.error('Payout error:', payoutErr);
+    }
+
     // Return record with match details
     const result = {
       ...rec,
+      txHash,
       matchDetails: {
-        home: match.strHomeTeam,
-        away: match.strAwayTeam,
+        home: match.home_team,
+        away: match.away_team,
         league: "NBA"
       }
     };

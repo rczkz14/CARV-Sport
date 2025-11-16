@@ -1,6 +1,7 @@
+require('dotenv').config({ path: '.env.local' });
 // Script to update NBA match results in history from SportDB
 const { createClient } = require('@supabase/supabase-js');
-const fetch = require('node-fetch');
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -40,6 +41,17 @@ async function updateResults() {
       const homeScore = event.intHomeScore !== undefined ? parseInt(event.intHomeScore) : null;
       const awayScore = event.intAwayScore !== undefined ? parseInt(event.intAwayScore) : null;
       if (status.toLowerCase() === 'ft' || status.toLowerCase() === 'final') {
+        // Determine winner
+        let winner = null;
+        if (homeScore !== null && awayScore !== null) {
+          if (homeScore > awayScore) {
+            winner = event.strHomeTeam || 'home';
+          } else if (awayScore > homeScore) {
+            winner = event.strAwayTeam || 'away';
+          } else {
+            winner = 'draw';
+          }
+        }
         // Update match in history
         const { error: updateError } = await supabase
           .from('nba_matches_history')
@@ -47,12 +59,13 @@ async function updateResults() {
             home_score: homeScore,
             away_score: awayScore,
             status: 'final',
+            winner: winner,
           })
           .eq('event_id', eventId);
         if (updateError) {
           console.error(`Error updating match ${eventId}:`, updateError.message);
         } else {
-          console.log(`Updated match ${eventId} with final score: ${homeScore}-${awayScore}`);
+          console.log(`Updated match ${eventId} with final score: ${homeScore}-${awayScore}, winner: ${winner}`);
         }
       } else {
         console.log(`Match ${eventId} not finished yet. Status: ${status}`);

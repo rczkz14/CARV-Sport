@@ -51,16 +51,20 @@ async function updatePredictionResult(eventId: string, finalMatch: any): Promise
       return false; // No score yet
     }
 
-    let actualWinner: string;
-    if (homeScore > awayScore) {
-      actualWinner = home;
-    } else if (awayScore > homeScore) {
-      actualWinner = away;
-    } else {
-      actualWinner = "Draw"; // For ties in soccer
+    // Use winner field from nba_matches_history if available
+    let actualWinner = finalMatch.winner ?? null;
+    if (!actualWinner) {
+      // Fallback: calculate winner from scores
+      if (homeScore > awayScore) {
+        actualWinner = home;
+      } else if (awayScore > homeScore) {
+        actualWinner = away;
+      } else {
+        actualWinner = "Draw";
+      }
     }
 
-    // Check if prediction was correct
+    // Check if prediction was correct (winner only)
     const predictedWinner = prediction.predictedWinner;
     const isCorrect = predictedWinner === actualWinner;
 

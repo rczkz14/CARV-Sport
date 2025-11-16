@@ -52,14 +52,17 @@ export async function GET(req: Request) {
       console.log('[Auto-Predict] Proceeding anyway (manual trigger allowed)');
     }
 
-    // 1. Get selected matches from nba_matches_pending (those with selected_for_date set)
-    const d1Date = getD1DateRangeWIB(nowUtc).dateStringWIB;
-    console.log(`[Auto-Predict] Looking for selected matches for D+1 date: ${d1Date}`);
+    // 1. Get selected matches from nba_matches_pending (by selected_for_date OR event_date in D+1 WIB window)
+    const { startUTC, endUTC, dateStringWIB } = getD1DateRangeWIB(nowUtc);
+    console.log(`[Auto-Predict] Looking for selected matches for D+1 date: ${dateStringWIB} (UTC window: ${new Date(startUTC).toISOString()} - ${new Date(endUTC).toISOString()})`);
 
+    // Query for matches where selected_for_date matches D+1 WIB date OR event_date falls within D+1 WIB window
     const { data: selectedMatches, error: selectError } = await supabase
       .from('nba_matches_pending')
-      .select('event_id')
-      .eq('selected_for_date', d1Date)
+      .select('event_id, event_date, selected_for_date')
+      .or(
+        `selected_for_date.eq.${dateStringWIB},and(event_date.gte.${new Date(startUTC).toISOString()},event_date.lte.${new Date(endUTC).toISOString()})`
+      )
       .not('event_id', 'is', null);
 
     if (selectError) {
@@ -72,13 +75,13 @@ export async function GET(req: Request) {
     }
 
     const lockedIds = selectedMatches?.map(m => m.event_id) || [];
-    console.log(`[Auto-Predict] Found ${lockedIds.length} selected matches for ${d1Date}:`, lockedIds);
+    console.log(`[Auto-Predict] Found ${lockedIds.length} selected matches for D+1:`, lockedIds);
 
     if (lockedIds.length === 0) {
-      console.log('[Auto-Predict] No selected matches found for this D+1 date');
+      console.log('[Auto-Predict] No selected matches found for D+1');
       return NextResponse.json({
         ok: true,
-        message: "No selected matches found for this D+1 date",
+        message: "No selected matches found for D+1",
         generatedCount: 0
       });
     }

@@ -5,7 +5,7 @@ async function triggerAutoPredict() {
     const response = await fetch('http://localhost:3000/api/worker/auto-predict-nba', {
       method: 'GET',
       headers: {
-        'Authorization': 'Bearer test-key', // Adjust if different
+        'Authorization': 'Bearer event-asu',
       },
     });
     const result = await response.json();

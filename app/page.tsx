@@ -526,19 +526,20 @@ export default function Page() {
 
   const loadPredictionResult = useCallback(async (eventid: string) => {
     try {
-      const res = await fetch(`/api/raffle?eventid=${eventid}`);
-      const j = await res.json();
-      if (j.ok && j.raffle) {
-        setPredictionResults(prev => ({
-          ...prev,
-          [eventid]: {
-            actualWinner: j.raffle.actualWinner,
-            isCorrect: j.raffle.isCorrect,
-            homeScore: j.raffle.homeScore,
-            awayScore: j.raffle.awayScore,
-            status: j.raffle.status
-          }
-        }));
+      // Use analytics API for NBA prediction correctness
+      const res = await fetch(`/api/analytics/predictions?nba=true`);
+      const arr = await res.json();
+      if (Array.isArray(arr)) {
+        const found = arr.find((x: any) => String(x.event_id) === String(eventid));
+        if (found) {
+          setPredictionResults(prev => ({
+            ...prev,
+            [eventid]: {
+              actualWinner: found.actual_winner,
+              isCorrect: found.is_correct,
+            }
+          }));
+        }
       }
     } catch (e) {
       console.error("Failed to load prediction result for", eventid, e);
@@ -1423,15 +1424,8 @@ export default function Page() {
                     if (leagueFilter === "LaLiga") return /laliga|la liga/i.test(ev.league ?? "") || /spanish|la\s+liga/i.test(ev.league ?? "");
                     return true;
                   })
-                  // REMOVE status/start filter: show all history events
-                  // .filter(ev => {
-                  //   const isStarted = isMatchStarted(ev);
-                  //   const isFinished = ev.status && /finished|final|ft/i.test(ev.status);
-                  //   if (!isStarted && !isFinished) return false;
-                  //   return true;
-                  // })
+                  // Show all matches, regardless of status
                   .filter(ev => {
-                    // Apply search filter only
                     if (!searchQuery) return true;
                     const q = searchQuery.toLowerCase();
                     return (
@@ -1512,7 +1506,11 @@ export default function Page() {
                                   </div>
 
                                   <div className="mt-1 text-sm opacity-90">
-                                    {((predictionResults[ev.id]?.status || ev.status)?.toLowerCase() === 'waiting for result') ? (
+                                    {isFinished ? (
+                                      <span className="px-2 py-1 rounded bg-red-600 text-white font-semibold mr-2">
+                                        Status: Full Time
+                                      </span>
+                                    ) : ((predictionResults[ev.id]?.status || ev.status)?.toLowerCase() === 'waiting for result') ? (
                                       <span className="px-2 py-1 rounded bg-yellow-500/20 text-yellow-400 font-semibold mr-2">
                                         Status: Waiting for Result
                                       </span>
@@ -1531,7 +1529,7 @@ export default function Page() {
                                   {ev.venue && <div className="text-xs opacity-60 mt-1">Venue: {ev.venue}</div>}
 
                                   <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
-                                    <span>👥</span>
+                                                                                                                                             <span>👥</span>
                                     <span>{(buyerCounts[ev.id] ?? 0) + ' buyer' + ((buyerCounts[ev.id] ?? 0) !== 1 ? 's' : '')}</span>
                                   </div>
                                 </div>
@@ -1547,6 +1545,18 @@ export default function Page() {
                                       ) : (
                                         <div className="text-xs opacity-70">Not purchased</div>
                                       )}
+                                      {/* Show prediction correctness in the right side below purchase status */}
+                                      {isFinished && (
+                                        <div className={`mt-2 text-xs font-bold px-2 py-1 rounded shadow flex items-center justify-center ${predictionResults[ev.id]?.isCorrect === true ? 'bg-green-600 text-white' : predictionResults[ev.id]?.isCorrect === false ? 'bg-red-600 text-white' : 'bg-gray-600 text-white'}`} style={{ fontSize: '0.85rem', minWidth: '80px', textAlign: 'center' }}>
+                                          <span className="animate-pulse">
+                                            {typeof predictionResults[ev.id]?.isCorrect === 'boolean'
+                                              ? (predictionResults[ev.id]?.isCorrect
+                                                ? '✅ Correct'
+                                                : '❌ Incorrect')
+                                              : 'No result'}
+                                          </span>
+                                        </div>
+                                      )}
                                     </div>
                                   ) : (
                                     alreadyBought ? (
@@ -1559,15 +1569,6 @@ export default function Page() {
                                     )
                                   )}
 
-                                  {isFinished && predictionResults[ev.id] && (
-                                    <span className={`text-xs px-2 py-1 rounded font-bold ${
-                                      predictionResults[ev.id].isCorrect
-                                        ? 'bg-green-500/20 text-green-400'
-                                        : 'bg-red-500/20 text-red-400'
-                                    }`}>
-                                      {predictionResults[ev.id].isCorrect ? '✅ CORRECT' : '❌ INCORRECT'}
-                                    </span>
-                                  )}
                                 </div>
                               </div>
                             </div>
@@ -1641,6 +1642,13 @@ export default function Page() {
                 <h3 className="text-xl mb-2">{leagueFilter === "EPL" || leagueFilter === "LaLiga" ? "⚽" : "🏀"} {currentMatch?.home} vs {currentMatch?.away}</h3>
                 <div className="space-y-1">
                   <div><strong>Predicted Score:</strong> {predictionDetails?.predictedScore}</div>
+                  {/* Show predicted home/away scores if available */}
+                  {predictionDetails?.predictedScore && predictionDetails?.predictedScore.includes('-') && (
+                    <div className="flex gap-2">
+                      <div><strong>Home Score:</strong> {predictionDetails?.predictedScore.split('-')[0]?.trim()}</div>
+                      <div><strong>Away Score:</strong> {predictionDetails?.predictedScore.split('-')[1]?.trim()}</div>
+                    </div>
+                  )}
                   <div><strong>Total Score:</strong> {predictionDetails?.totalScore}</div>
                   <div><strong>Predicted Winner:</strong> {predictionDetails?.predictedWinner}</div>
                   <div><strong>Confidence:</strong> {predictionDetails?.confidence}%</div>

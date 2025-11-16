@@ -1,3 +1,4 @@
+require('dotenv').config({ path: '.env.local' });
 // Script to move NBA matches from pending to history at 04:00 WIB (21:00 UTC)
 const { createClient } = require('@supabase/supabase-js');
 
