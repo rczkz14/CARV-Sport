@@ -63,6 +63,17 @@ async function processRaffles(historyTable: string, raffleTable: string, league:
       continue;
     }
 
+    // Update purchases created_at to raffle start time
+    const { error: updateError } = await supabase
+      .from('purchases')
+      .update({ created_at: new Date().toISOString() })
+      .eq('eventid', eventId);
+
+    if (updateError) {
+      console.error(`[Auto-Raffle ${league}] Failed to update purchases created_at for ${eventId}:`, updateError);
+      // Continue anyway
+    }
+
     const buyers = purchases.map((p: any) => p.buyer);
 
     // Select random winner

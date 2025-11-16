@@ -226,6 +226,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "no entries for event" }, { status: 400 });
     }
 
+    // Update purchases created_at to raffle start time
+    const { error: updateError } = await supabase
+      .from('purchases')
+      .update({ created_at: new Date().toISOString() })
+      .eq('eventid', eventid);
+
+    if (updateError) {
+      console.error('Failed to update purchases created_at:', updateError);
+      // Continue anyway
+    }
+
     const entries = purchases;
 
     // choose unique winners up to winnersCount
