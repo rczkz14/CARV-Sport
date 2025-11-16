@@ -1,0 +1,26 @@
+{
+  "eventId": "2357555",
+  "matchDetails": {
+    "home": "Boston Celtics",
+    "away": "Los Angeles Clippers",
+    "league": "NBA",
+    "datetime": "2025-11-16T20:30:00+00:00",
+    "venue": "TD Garden"
+  },
+  "prediction": {
+    "predictedScore": "111-124",
+    "totalScore": 235,
+    "predictedWinner": "Los Angeles Clippers",
+    "confidence": 73,
+    "review": "Bench scoring gets involved early for Los Angeles Clippers, highlighting the talent advantage. Boston Celtics is overmatched across the board. Boston Celtics's defensive rotations are two steps behind. Los Angeles Clippers's star player creates for others when double-teamed. Los Angeles Clippers's bench produces crucial points when starters are in foul trouble. Boston Celtics's injury situation forces unexpected lineup combinations.",
+    "generatedAt": "2025-11-16T09:12:45.699Z"
+  },
+  "predictionText": "Prediction\n\n🏀 Boston Celtics vs Los Angeles Clippers\nPredicted Score: 111-124\nTotal Score: 235\nPredicted Winner: Los Angeles Clippers\nConfidence: 73%\n\nReview:\nBench scoring gets involved early for Los Angeles Clippers, highlighting the talent advantage. Boston Celtics is overmatched across the board. Boston Celtics's defensive rotations are two steps behind. Los Angeles Clippers's star player creates for others when double-teamed. Los Angeles Clippers's bench produces crucial points when starters are in foul trouble. Boston Celtics's injury situation forces unexpected lineup combinations.\n\nGenerated: 2025-11-16T09:12:45.699Z",
+  "actualWinner": null,
+  "actualResult": null,
+  "isCorrect": null,
+  "homeScore": null,
+  "awayScore": null,
+  "status": null,
+  "createdAt": "2025-11-16T09:12:45.699Z"
+}

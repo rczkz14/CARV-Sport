@@ -64,20 +64,29 @@ export async function GET(req: Request) {
         .select('*');
 
       if (!nbaError && Array.isArray(nbaData)) {
-        const nbaMatches = nbaData.map((e: any) => ({
-          id: e.event_id || e.id,
-          league: 'NBA',
-          home: e.home_team,
-          away: e.away_team,
-          datetime: e.event_date,
-          venue: e.venue || null,
-          homeScore: e.home_score,
-          awayScore: e.away_score,
-          buyable: e.selected_for_date !== null,
-          status: e.status || null,
-          created_at: e.created_at,
-          raw: e,
-        }));
+        const nbaMatches = nbaData.map((e: any) => {
+          // Check if match is within 24 hours and upcoming
+          const eventTime = new Date(e.event_date);
+          const now = new Date();
+          const timeDiff = eventTime.getTime() - now.getTime();
+          const isWithin24h = timeDiff > 0 && timeDiff <= 24 * 60 * 60 * 1000;
+          const isUpcoming = eventTime > now;
+
+          return {
+            id: e.event_id || e.id,
+            league: 'NBA',
+            home: e.home_team,
+            away: e.away_team,
+            datetime: e.event_date,
+            venue: e.venue || null,
+            homeScore: e.home_score,
+            awayScore: e.away_score,
+            buyable: isUpcoming && isWithin24h,
+            status: e.status || null,
+            created_at: e.created_at,
+            raw: e,
+          };
+        });
         result.push(...nbaMatches);
       }
 

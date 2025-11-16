@@ -34,16 +34,7 @@ export async function GET(req: Request) {
       if (!soccerError && soccerPred) {
         prediction = soccerPred.prediction_text;
       } else {
-        // Fallback to JSON file for other leagues
-        try {
-          const file = path.join(DATA_DIR, "predictions.json");
-          const raw = await fs.readFile(file, "utf8");
-          const map = JSON.parse(raw || "{}");
-          prediction = map[eventId] ?? null;
-        } catch (e) {
-          // JSON file doesn't exist or can't be read
-          prediction = null;
-        }
+        prediction = null;
       }
     }
 

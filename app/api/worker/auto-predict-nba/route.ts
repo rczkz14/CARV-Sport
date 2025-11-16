@@ -155,7 +155,7 @@ export async function GET(req: Request) {
       matchesToPredict.map((m: any) => `${m.home} vs ${m.away}`));
 
 
-    const generatedCount = await generatePredictionsForMatches(matchesToPredict, { bypassLeagueCheck: true });
+    const generatedCount = await generatePredictionsForMatches(matchesToPredict, { bypassLeagueCheck: true, skipRaffleFile: true });
 
     // Store predictions in Supabase
     for (const match of matchesToPredict) {

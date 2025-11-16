@@ -367,7 +367,7 @@ async function predictionExists(eventId: string): Promise<boolean> {
 /**
 /**
  * Generate predictions for selected matches
- * 
+ *
  * IMPORTANT: For NBA matches, this should ONLY be called from auto-predict-nba endpoint
  * with locked match IDs. Never call this directly for NBA matches!
  */
@@ -380,10 +380,11 @@ export async function generatePredictionsForMatches(
     datetime: string | null;
     venue?: string | null;
   }>,
-  options?: { bypassLeagueCheck?: boolean }
+  options?: { bypassLeagueCheck?: boolean; skipRaffleFile?: boolean }
 ): Promise<number> {
   let generated = 0;
   const shouldCheckLeague = !options?.bypassLeagueCheck;
+  const skipRaffleFile = options?.skipRaffleFile || false;
 
   for (const match of matches) {
     try {
@@ -417,8 +418,11 @@ export async function generatePredictionsForMatches(
         prediction = generateAIPrediction(match.home, match.away, match.league);
       }
 
-      await saveRaffleWithPrediction(match.id, prediction, match);
-      
+      // Only save to raffle file if not skipped (for NBA matches saved to Supabase)
+      if (!skipRaffleFile) {
+        await saveRaffleWithPrediction(match.id, prediction, match);
+      }
+
       generated++;
     } catch (error) {
       console.error(`[PredictionGenerator] Error generating prediction for ${match.id}:`, error);
