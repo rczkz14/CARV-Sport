@@ -55,9 +55,11 @@ const TEAM_LOGOS: Record<string, string> = {
   'Spurs': '/images/san-antonio-spurs.png',
   'Oklahoma City Thunder': '/images/Oklahoma-City-Thunder.png',
   'Thunder': '/images/Oklahoma-City-Thunder.png',
-  'Portland Trail Blazers': '/images/Portland-Trail-Blazers.png',
-  'Trail Blazers': '/images/Portland-Trail-Blazers.png',
-  'Blazers': '/images/Portland-Trail-Blazers.png',
+  'Portland Trail Blazers': '/images/portland-trail-blazers.png',
+  'Trail Blazers': '/images/portland-trail-blazers.png',
+  'Blazers': '/images/portland-trail-blazers.png',
+  'Houston Rockets': '/images/houston-rockets.png',
+  'Rockets': '/images/houston-rockets.png',
 
   // EPL Teams
   'Arsenal': '/images/Brentford.png',
