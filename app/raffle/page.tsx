@@ -3,27 +3,16 @@
 import React, { useEffect, useState } from "react";
 
 interface RaffleResult {
-  id: string;
-  eventId: string;
-  date: string;
-  winners: string[];
-  buyerCount: number;
-  entries: Array<{
-    id: string;
-    buyer: string;
-    txid: string;
-    timestamp: string;
-  }>;
-  token: string;
-  createdAt: string;
-  prizePool: number;
-  winnerPayout: number;
-  txHash: string;
-  matchDetails?: {
-    home: string;
-    away: string;
-    league: string;
-  };
+  event_id: string;
+  home_team: string;
+  away_team: string;
+  winner: string;
+  prize_pool: number;
+  winner_payout: number;
+  created_at: string;
+  buyer_count: number;
+  tx_hash?: string;
+  league?: string;
 }
 
 export default function RafflePage() {
@@ -90,26 +79,29 @@ export default function RafflePage() {
           ) : (
             <div className="space-y-4">
               {raffleResults.map((raffle) => {
-                const winners = Array.isArray(raffle.winners) ? raffle.winners : [];
-                const winner = winners.length > 0 ? winners[0] : null;
-                const walletDisplay = winner ? winner.slice(0, 6) + '...' + winner.slice(-4) : 'No winner yet';
-                
+                // Winner: first 5 and last 5 chars
+                const winnerDisplay = raffle.winner
+                  ? raffle.winner.length > 10
+                    ? raffle.winner.slice(0, 5) + '...' + raffle.winner.slice(-5)
+                    : raffle.winner
+                  : 'No winner yet';
+
                 return (
-                  <div key={raffle.eventId} className={`p-6 rounded-xl ${darkMode ? "bg-gray-800/80 border border-gray-700" : "bg-gray-100 border border-gray-300"}`}>
+                  <div key={raffle.event_id} className={`p-6 rounded-xl ${darkMode ? "bg-gray-800/80 border border-gray-700" : "bg-gray-100 border border-gray-300"}`}>
                     <div className="flex gap-6">
                       {/* Left side: Match info */}
                       <div className="flex-1">
                         <div className="flex justify-between items-start">
                           <div>
-                            <div className="text-sm text-indigo-400 font-medium">{raffle.matchDetails?.league || 'NBA'}</div>
+                            <div className="text-sm text-indigo-400 font-medium">NBA</div>
                             <div className="text-lg font-semibold flex items-center gap-3 mt-1">
-                              <span>{raffle.matchDetails?.home || 'Home Team'}</span>
+                              <span>{raffle.home_team || 'Home Team'}</span>
                               <span className="opacity-50">vs</span>
-                              <span>{raffle.matchDetails?.away || 'Away Team'}</span>
+                              <span>{raffle.away_team || 'Away Team'}</span>
                             </div>
                           </div>
                           <div className="text-sm text-gray-400">
-                            Event #{raffle.eventId}
+                            Event #{raffle.event_id}
                           </div>
                         </div>
 
@@ -118,7 +110,7 @@ export default function RafflePage() {
                           <div className="bg-green-500/10 rounded-lg p-3">
                             <div className="text-sm text-gray-400 mb-2">Winner</div>
                             <div className="font-mono text-green-400 text-sm">
-                              {walletDisplay}
+                              {winnerDisplay}
                             </div>
                           </div>
 
@@ -126,7 +118,7 @@ export default function RafflePage() {
                           <div className="bg-blue-500/10 rounded-lg p-3">
                             <div className="text-sm text-gray-400 mb-2">Prize Pool</div>
                             <div className="font-mono text-blue-400 text-sm">
-                              {raffle.prizePool ? raffle.prizePool.toFixed(1) : '0.0'} $CARV
+                              {raffle.prize_pool ? raffle.prize_pool.toFixed(1) : '0.0'} $CARV
                             </div>
                           </div>
 
@@ -134,13 +126,13 @@ export default function RafflePage() {
                           <div className="bg-yellow-400/10 rounded-lg p-3">
                             <div className="text-sm text-gray-400 mb-2">Payout</div>
                             <div className="font-mono text-yellow-400 text-sm">
-                              {raffle.winnerPayout ? raffle.winnerPayout.toFixed(1) : '0.0'} $CARV
+                              {raffle.winner_payout ? raffle.winner_payout.toFixed(1) : '0.0'} $CARV
                             </div>
                           </div>
                         </div>
 
                         <div className="mt-4 text-xs text-gray-500">
-                          Draw completed: {new Date(raffle.createdAt).toLocaleString()}
+                          Draw completed: (working it later)
                         </div>
                       </div>
 
