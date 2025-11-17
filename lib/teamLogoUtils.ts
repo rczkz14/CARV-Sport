@@ -82,7 +82,10 @@ export function getTeamLogo(teamName: string, league?: string): string {
   // Normalize: lowercase and trim only (no hyphens)
   const normalized = teamName.trim().toLowerCase();
   const logoPath = TEAM_LOGOS[normalized];
-  
+  // Debug log for troubleshooting
+  if (typeof window !== 'undefined') {
+    console.log('[getTeamLogo] lookup:', { teamName, normalized, logoPath });
+  }
   if (logoPath) {
     return logoPath;
   }
