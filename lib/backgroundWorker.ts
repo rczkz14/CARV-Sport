@@ -210,6 +210,23 @@ export async function runWorker() {
       }
     }
 
+    // Step 6: Run auto-raffle at scheduled time (15:00 WIB = 08:00 UTC)
+    const utcHour = now.getUTCHours();
+    const utcMinute = now.getUTCMinutes();
+    const shouldRunRaffle = utcHour === 8 && utcMinute < 5; // 15:00-15:05 WIB
+
+    if (shouldRunRaffle) {
+      console.log('[Worker] Running scheduled auto-raffle...');
+      try {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/worker/auto-raffle`, {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${process.env.WORKER_API_KEY || 'test-key'}` }
+        }).catch(() => null); // Don't fail worker if raffle fails
+      } catch (error) {
+        console.warn('[Worker] Auto-raffle failed:', error);
+      }
+    }
+
     console.log('[Worker] Worker completed successfully');
   } catch (error) {
     console.error('[Worker] Error running worker:', error);

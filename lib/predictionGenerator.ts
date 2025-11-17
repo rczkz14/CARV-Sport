@@ -380,11 +380,13 @@ export async function generatePredictionsForMatches(
     datetime: string | null;
     venue?: string | null;
   }>,
-  options?: { bypassLeagueCheck?: boolean; skipRaffleFile?: boolean }
-): Promise<number> {
+  options?: { bypassLeagueCheck?: boolean; skipRaffleFile?: boolean; returnPredictions?: boolean }
+): Promise<number | Array<{match: any, prediction: Prediction}>> {
   let generated = 0;
   const shouldCheckLeague = !options?.bypassLeagueCheck;
   const skipRaffleFile = options?.skipRaffleFile || false;
+  const returnPredictions = options?.returnPredictions || false;
+  const predictions: Array<{match: any, prediction: Prediction}> = [];
 
   for (const match of matches) {
     try {
@@ -423,6 +425,11 @@ export async function generatePredictionsForMatches(
         await saveRaffleWithPrediction(match.id, prediction, match);
       }
 
+      // Collect prediction if returning predictions
+      if (returnPredictions) {
+        predictions.push({ match, prediction });
+      }
+
       generated++;
     } catch (error) {
       console.error(`[PredictionGenerator] Error generating prediction for ${match.id}:`, error);
@@ -430,6 +437,11 @@ export async function generatePredictionsForMatches(
   }
 
   console.log(`[PredictionGenerator] Generated ${generated} new predictions`);
+
+  if (returnPredictions) {
+    return predictions;
+  }
+
   return generated;
 }
 

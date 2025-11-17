@@ -256,15 +256,16 @@ export async function POST(request: Request) {
     const winnerPayout = prizePool * 0.8;
 
     // create raffle record
+    const now = new Date().toISOString();
     const rec = {
       id: `${eventid}-${uuidv4()}`,
       eventid: String(eventid),
-      date: new Date().toISOString().slice(0, 10), // YYYY-MM-DD (UTC)
+      date: now.slice(0, 10), // YYYY-MM-DD (UTC)
       winners,
       buyerCount: entries.length,
       entries: entries.map(e => ({ id: e.id, buyer: e.buyer, txid: e.txid, timestamp: e.timestamp })),
       token,
-      createdAt: new Date().toISOString(),
+      created_at: now,
       prizePool,
       winnerPayout
     };
@@ -281,7 +282,8 @@ export async function POST(request: Request) {
       token: rec.token || "CARV",
       league: "NBA",
       home_team: match.home_team,
-      away_team: match.away_team
+      away_team: match.away_team,
+      created_at: rec.created_at
     };
 
     const { error: insertError } = await supabase.from('nba_raffle').insert(raffleRecord);

@@ -155,24 +155,31 @@ export async function GET(req: Request) {
       matchesToPredict.map((m: any) => `${m.home} vs ${m.away}`));
 
 
-    const generatedCount = await generatePredictionsForMatches(matchesToPredict, { bypassLeagueCheck: true, skipRaffleFile: true });
+    const predictionResults = await generatePredictionsForMatches(matchesToPredict, { bypassLeagueCheck: true, skipRaffleFile: true, returnPredictions: true });
+    const generatedCount = Array.isArray(predictionResults) ? predictionResults.length : predictionResults;
 
     // Store predictions in Supabase
-    for (const match of matchesToPredict) {
-      console.log(`[Auto-Predict] Processing match ${match.id}: ${match.home} vs ${match.away}`);
-      try {
-        const prediction = await getPredictionForMatch(match.id);
-        console.log(`[Auto-Predict] Got prediction for ${match.id}:`, prediction ? 'yes' : 'no');
-        if (prediction && prediction.prediction) {
-          const { predictedWinner, generatedAt } = prediction.prediction;
-          const { id } = match;
-          const { status } = prediction;
+    if (Array.isArray(predictionResults)) {
+      for (const { match, prediction } of predictionResults) {
+        console.log(`[Auto-Predict] Processing match ${match.id}: ${match.home} vs ${match.away}`);
+        try {
           const upsertData = {
-            event_id: id,
-            prediction_winner: predictedWinner,
-            prediction_time: generatedAt,
-            status: status || 'pending',
-            prediction_text: prediction.predictionText,
+            event_id: match.id,
+            prediction_winner: prediction.predictedWinner,
+            prediction_time: prediction.generatedAt,
+            status: 'generated',
+            prediction_text: `Prediction
+
+🏀 ${match.home} vs ${match.away}
+Predicted Score: ${prediction.predictedScore}
+Total Score: ${prediction.totalScore}
+Predicted Winner: ${prediction.predictedWinner}
+Confidence: ${prediction.confidence}%
+
+Review:
+${prediction.review}
+
+Generated: ${prediction.generatedAt}`,
             created_at: new Date().toISOString(),
           };
           console.log(`[Auto-Predict] Upserting to nba_predictions:`, upsertData);
@@ -183,11 +190,9 @@ export async function GET(req: Request) {
           } else {
             console.warn(`[Auto-Predict] Upsert error for ${match.id}:`, error.message);
           }
-        } else {
-          console.warn(`[Auto-Predict] No prediction data for match ${match.id}`);
+        } catch (e) {
+          console.warn(`[Auto-Predict] Error saving prediction for match ${match.id} to Supabase:`, e);
         }
-      } catch (e) {
-        console.warn(`[Auto-Predict] Error saving prediction for match ${match.id} to Supabase:`, e);
       }
     }
 

@@ -575,7 +575,7 @@ export default function Page() {
   // Load predictions for finished matches in history view
   useEffect(() => {
     if (showHistory) {
-      const finishedMatches = events.filter(ev => ev.status && /finished|final|ft/i.test(ev.status));
+      const finishedMatches = events.filter(ev => ev.status && /finished|final|ft|aot|after overtime/i.test(ev.status));
       finishedMatches.forEach(ev => {
         if (!matchPredictions[ev.id]) {
           loadPredictionForMatch(ev);
@@ -641,7 +641,7 @@ export default function Page() {
       try {
         const respChk = await fetch("/api/purchases");
         const jChk = await respChk.json();
-        const purchases: any[] = Array.isArray(jChk?.purchases) ? jChk.purchases : (jChk?.purchases ?? []);
+        const purchases: any[] = Array.isArray(jChk?.purchases) ? j.purchases : (jChk?.purchases ?? []);
         const already = purchases.find(p => String(p.eventid) === String(ev.id) && String(p.buyer) === String(walletPubKeyStr));
         if (already) {
           setPurchasedByWallet(prev => ({ ...prev, [ev.id]: true }));
@@ -954,11 +954,9 @@ export default function Page() {
           top: 0,
           left: 0,
           width: '100%',
-          height: '150vh',
+          height: '100vh',
           zIndex: 0,
-          overflow: 'hidden',
-          transform: 'scale(0.68)',
-          transformOrigin: 'top center'
+          overflow: 'hidden'
         }}>
           <video
             key={`video-${leagueFilter}`}
@@ -1458,7 +1456,7 @@ export default function Page() {
                           const localDate = jk ? jk.date : "(unknown)";
                           const localTime = jk ? `${String(jk.hour).padStart(2,"0")}:${String(jk.minute).padStart(2,"0")}` : "";
                           const alreadyBought = Boolean(purchasedByWallet[ev.id]);
-                          const isFinished = ev.status && /finished|final|ft/i.test(ev.status);
+                          const isFinished = ev.status && /finished|final|ft|aot|after overtime/i.test(ev.status);
                           const prediction = matchPredictions[ev.id];
 
                           return (
@@ -1506,9 +1504,13 @@ export default function Page() {
                                   </div>
 
                                   <div className="mt-1 text-sm opacity-90">
-                                    {isFinished ? (
+                                    {((predictionResults[ev.id]?.status || ev.status)?.toLowerCase() === 'final' || (predictionResults[ev.id]?.status || ev.status)?.toLowerCase() === 'ft') ? (
                                       <span className="px-2 py-1 rounded bg-red-600 text-white font-semibold mr-2">
                                         Status: Full Time
+                                      </span>
+                                    ) : ((predictionResults[ev.id]?.status || ev.status)?.toLowerCase() === 'aot' || (predictionResults[ev.id]?.status || ev.status)?.toLowerCase() === 'after overtime') ? (
+                                      <span className="px-2 py-1 rounded bg-orange-500 text-white font-semibold mr-2">
+                                        Status: After Overtime
                                       </span>
                                     ) : ((predictionResults[ev.id]?.status || ev.status)?.toLowerCase() === 'waiting for result') ? (
                                       <span className="px-2 py-1 rounded bg-yellow-500/20 text-yellow-400 font-semibold mr-2">

@@ -33,7 +33,7 @@ export async function GET(req: Request) {
             .single();
 
           const hasResult = !historyError && matchHistory &&
-            (String(matchHistory.status).toLowerCase() === 'ft' || String(matchHistory.status).toLowerCase() === 'final') &&
+            (String(matchHistory.status).toLowerCase() === 'ft' || String(matchHistory.status).toLowerCase() === 'final' || String(matchHistory.status).toLowerCase() === 'aot') &&
             matchHistory.home_score !== null && matchHistory.away_score !== null;
 
           if (includePending || hasResult) {

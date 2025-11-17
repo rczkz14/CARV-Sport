@@ -7,10 +7,14 @@
  * This is a server-side background job that runs without needing a browser tab
  */
 
+import 'dotenv/config';
 import { CronJob } from 'cron';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { createClient } from '@supabase/supabase-js';
+
+const __filename = fileURLToPath(import.meta.url);
 
 const CACHE_FILE = path.join(process.cwd(), 'data/api_fetch.json');
 const NBA_LOCKED_FILE = path.join(process.cwd(), 'data/nba_locked_selection.json');
@@ -69,6 +73,8 @@ async function archiveNBAMatchesFromSupabase(): Promise<void> {
       return;
     }
 
+    console.log('[Window Close] Fetched pendingMatches:', JSON.stringify(pendingMatches, null, 2));
+
     if (!pendingMatches || pendingMatches.length === 0) {
       console.log('[Window Close] No NBA matches in pending table');
       return;
@@ -90,8 +96,10 @@ async function archiveNBAMatchesFromSupabase(): Promise<void> {
       away_score: match.away_score || null,
     }));
 
+    console.log('[Window Close] Prepared historyEntries:', JSON.stringify(historyEntries, null, 2));
+
     // Insert into history table
-    const { error: insertError } = await supabase
+    const { error: insertError, data: insertData } = await supabase
       .from('nba_matches_history')
       .upsert(historyEntries, { onConflict: 'event_id' });
 
@@ -99,10 +107,12 @@ async function archiveNBAMatchesFromSupabase(): Promise<void> {
       console.error('[Window Close] Error inserting NBA matches to history:', insertError.message);
       return;
     }
+    console.log('[Window Close] Inserted to history:', JSON.stringify(insertData, null, 2));
 
     // Delete from pending table
     const eventIds = pendingMatches.map(m => m.event_id);
-    const { error: deleteError } = await supabase
+    console.log('[Window Close] Deleting eventIds from pending:', JSON.stringify(eventIds, null, 2));
+    const { error: deleteError, data: deleteData } = await supabase
       .from('nba_matches_pending')
       .delete()
       .in('event_id', eventIds);
@@ -111,6 +121,7 @@ async function archiveNBAMatchesFromSupabase(): Promise<void> {
       console.error('[Window Close] Error deleting NBA matches from pending:', deleteError.message);
       return;
     }
+    console.log('[Window Close] Deleted from pending:', JSON.stringify(deleteData, null, 2));
 
     console.log(`[${new Date().toISOString()}] [Window Close] ✓ Archived ${pendingMatches.length} NBA matches from Supabase`);
   } catch (error: any) {
@@ -306,4 +317,19 @@ export function stopWindowCloseCrons() {
   } catch (error: any) {
     console.error('[Window Close] Error stopping cron jobs:', error?.message || error);
   }
+}
+
+// Export the NBA archival function for manual testing
+export { archiveNBAMatchesFromSupabase };
+
+// Run NBA archival if this file is executed directly
+if (process.argv[1] === __filename) {
+  console.log('[Window Close] Running NBA archival manually...');
+  archiveNBAMatchesFromSupabase().then(() => {
+    console.log('[Window Close] Manual NBA archival completed');
+    process.exit(0);
+  }).catch((error) => {
+    console.error('[Window Close] Manual NBA archival failed:', error);
+    process.exit(1);
+  });
 }

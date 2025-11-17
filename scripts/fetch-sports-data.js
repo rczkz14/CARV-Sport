@@ -1,8 +1,13 @@
 
 
-require('dotenv').config({ path: '.env.local' });
-const fs = require('fs').promises;
-const path = require('path');
+import 'dotenv/config';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { createClient } from '@supabase/supabase-js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const SPORTSDB_KEY = process.env.SPORTSDB_KEY || "123";
 const BASE = `https://www.thesportsdb.com/api/v1/json/${SPORTSDB_KEY}`;
@@ -26,12 +31,29 @@ async function fetchWithRetry(url, retries = 3) {
 }
 
 async function fetchNBAMatchesForToday() {
-  // --- PATCH: Search for matches on 17 Nov and 18 Nov WIB ---
-  const targetDates = [
-    { day: 17, month: 10, year: 2025 }, // 17 Nov 2025
-    { day: 18, month: 10, year: 2025 }  // 18 Nov 2025
-  ];
+  // Calculate target dates: tomorrow and day after tomorrow in WIB
   const WIB_OFFSET = 7 * 60 * 60 * 1000;
+  const currentTime = new Date();
+  const wibNow = new Date(currentTime.getTime() + WIB_OFFSET);
+
+  const tomorrow = new Date(wibNow);
+  tomorrow.setDate(wibNow.getDate() + 1);
+
+  const dayAfterTomorrow = new Date(wibNow);
+  dayAfterTomorrow.setDate(wibNow.getDate() + 2);
+
+  const targetDates = [
+    {
+      day: tomorrow.getDate(),
+      month: tomorrow.getMonth(),
+      year: tomorrow.getFullYear()
+    },
+    {
+      day: dayAfterTomorrow.getDate(),
+      month: dayAfterTomorrow.getMonth(),
+      year: dayAfterTomorrow.getFullYear()
+    }
+  ];
 
   // We'll fetch for a range of UTC dates to cover both WIB dates
   // Let's try today, tomorrow, and yesterday in UTC to cover all possible matches
@@ -83,7 +105,6 @@ async function fetchNBAMatchesForToday() {
 
   // Insert matches into Supabase
   try {
-    const { createClient } = require('@supabase/supabase-js');
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     const supabase = createClient(supabaseUrl, supabaseAnonKey);

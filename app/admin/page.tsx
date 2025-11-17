@@ -187,20 +187,37 @@ export default function AdminDashboard() {
               <th className="px-2 py-1">Event ID</th>
               <th className="px-2 py-1">Home</th>
               <th className="px-2 py-1">Away</th>
+              <th className="px-2 py-1">Time</th>
               <th className="px-2 py-1">Status</th>
               <th className="px-2 py-1">Buyers</th>
               <th className="px-2 py-1">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {matches.map((m) => (
+            {matches
+              .sort((a, b) => new Date(b.event_date || b.datetime || 0).getTime() - new Date(a.event_date || a.datetime || 0).getTime())
+              .map((m) => (
               <tr key={m.event_id} className="border-t border-gray-700">
                 <td className="px-2 py-2 text-sm">{m.event_id}</td>
                 <td className="px-2 py-2 text-sm">{m.home_team}</td>
                 <td className="px-2 py-2 text-sm">{m.away_team}</td>
+                <td className="px-2 py-2 text-sm text-xs">
+                  {m.event_date ? new Date(m.event_date).toLocaleString('en-GB', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  }) : 'N/A'}
+                </td>
                 <td className="px-2 py-2 text-sm">
-                  {m.status === 'final' ? (
-                    <span className="px-2 py-1 rounded bg-green-700 text-white text-xs">FINAL</span>
+                  {m.status === 'final' || m.status === 'Full Time' ? (
+                    <span style={{backgroundColor: 'red', color: 'white', padding: '4px 12px', borderRadius: '6px', fontWeight: 'bold'}}>
+                      Status: Full Time
+                    </span>
+                  ) : m.status === 'AOT' || m.status === 'After Overtime' ? (
+                    <span style={{backgroundColor: '#d32f2f', color: 'white', padding: '4px 12px', borderRadius: '6px', fontWeight: 'bold'}}>
+                      Status: After Overtime
+                    </span>
                   ) : (
                     <span className="px-2 py-1 rounded bg-yellow-700 text-white text-xs">{m.status}</span>
                   )}
@@ -209,13 +226,39 @@ export default function AdminDashboard() {
                   {buyersByEventId[m.event_id]?.length || 0}
                 </td>
                 <td className="px-2 py-2 text-sm flex gap-2 items-center">
-                  <button
-                    className="px-3 py-1 bg-indigo-700 rounded text-xs hover:bg-indigo-800 disabled:opacity-50"
-                    disabled={raffleLoadingId === m.event_id || m.status !== 'final' || !buyersByEventId[m.event_id]?.length || raffleExistsByEventId[m.event_id]}
-                    onClick={() => handleRunRaffle(m.event_id)}
-                  >
-                    {raffleLoadingId === m.event_id ? 'Running…' : raffleExistsByEventId[m.event_id] ? 'Raffle Done' : 'Run Raffle'}
-                  </button>
+                  {(() => {
+                    const buttonText = raffleLoadingId === m.event_id ? 'Running…' :
+                                     raffleExistsByEventId[m.event_id] ? 'Raffle Done' :
+                                     !buyersByEventId[m.event_id]?.length ? '0 Buyers' :
+                                     (m.status !== 'final' && m.status !== 'AOT') ? 'Not Eligible' :
+                                     'Run Raffle';
+
+                    const getButtonClass = (text: string) => {
+                      const baseClass = "px-3 py-1 rounded text-xs disabled:opacity-50";
+                      switch (text) {
+                        case 'Raffle Done':
+                          return `${baseClass} bg-green-700 hover:bg-green-800`;
+                        case '0 Buyers':
+                          return `${baseClass} bg-gray-600 hover:bg-gray-700 cursor-not-allowed`;
+                        case 'Not Eligible':
+                          return `${baseClass} bg-red-700 hover:bg-red-800 cursor-not-allowed`;
+                        case 'Running…':
+                          return `${baseClass} bg-yellow-600 hover:bg-yellow-700`;
+                        default:
+                          return `${baseClass} bg-indigo-700 hover:bg-indigo-800`;
+                      }
+                    };
+
+                    return (
+                      <button
+                        className={getButtonClass(buttonText)}
+                        disabled={raffleLoadingId === m.event_id || (m.status !== 'final' && m.status !== 'AOT') || !buyersByEventId[m.event_id]?.length || raffleExistsByEventId[m.event_id]}
+                        onClick={() => handleRunRaffle(m.event_id)}
+                      >
+                        {buttonText}
+                      </button>
+                    );
+                  })()}
                   <button
                     className="px-2 py-1 bg-gray-700 rounded text-xs hover:bg-gray-800 border border-gray-600"
                     onClick={() => setOpenDropdownId(openDropdownId === m.event_id ? null : m.event_id)}

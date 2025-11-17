@@ -1,7 +1,7 @@
 /**
  * Auto-Raffle Worker
  * Triggers at 15:00 WIB (08:00 UTC)
- * Automatically runs raffle for NBA matches with FT status
+ * Automatically runs raffle for NBA matches with FT or AOT status
  */
 
 import { NextResponse } from "next/server";
@@ -21,7 +21,7 @@ async function processRaffles(historyTable: string, raffleTable: string, league:
   // Filter for finished matches
   const ftMatches = (allMatches || []).filter(match => {
     const status = String(match.status || '').replace(/\s+/g, '').toLowerCase();
-    return status.includes('final') || status === 'ft';
+    return status.includes('final') || status === 'ft' || status === 'aot';
   });
 
   if (!ftMatches || ftMatches.length === 0) {
