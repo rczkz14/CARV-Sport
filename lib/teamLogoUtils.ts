@@ -79,7 +79,8 @@ const TEAM_COLORS: Record<string, string> = {
  * Also accepts optional league parameter for better detection
  */
 export function getTeamLogo(teamName: string, league?: string): string {
-  const normalized = teamName.trim().toLowerCase();
+  // Normalize: lowercase, replace spaces/underscores with hyphens
+  const normalized = teamName.trim().toLowerCase().replace(/\s+/g, '-').replace(/_/g, '-');
   const logoPath = TEAM_LOGOS[normalized];
   
   if (logoPath) {
