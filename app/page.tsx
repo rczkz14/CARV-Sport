@@ -641,7 +641,7 @@ export default function Page() {
       try {
         const respChk = await fetch("/api/purchases");
         const jChk = await respChk.json();
-        const purchases: any[] = Array.isArray(jChk?.purchases) ? j.purchases : (jChk?.purchases ?? []);
+        const purchases: any[] = Array.isArray(jChk?.purchases) ? jChk.purchases : (jChk?.purchases ?? []);
         const already = purchases.find(p => String(p.eventid) === String(ev.id) && String(p.buyer) === String(walletPubKeyStr));
         if (already) {
           setPurchasedByWallet(prev => ({ ...prev, [ev.id]: true }));
