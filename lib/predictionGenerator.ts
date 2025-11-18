@@ -134,25 +134,56 @@ function generateNBAAIPrediction(homeTeam: string, awayTeam: string): Prediction
 
   const eventId = Math.random().toString(36).slice(2, 10);
 
-  // Dynamic score generation based on team strength
-  const homeStrength = Math.floor(Math.random() * 15) + 105; // 105-120
-  const awayStrength = Math.floor(Math.random() * 15) + 105; // 105-120
+  // Get team contexts
+  const homeCtx = teamContextModule ? teamContextModule.getTeamContext(homeTeam) : null;
+  const awayCtx = teamContextModule ? teamContextModule.getTeamContext(awayTeam) : null;
 
-  // Determine winner with more sophisticated logic
-  let isHome = Math.random() < 0.55; // 55% home court advantage baseline
-  const homeScore = isHome ? homeStrength + 8 : homeStrength - 8;
-  const awayScore = isHome ? awayStrength - 8 : awayStrength + 8;
+  // Calculate advantage using team ratings and factors
+  let homeAdvantage = 3; // Home court advantage
+  if (homeCtx && awayCtx) {
+    // Offensive vs Defensive matchup
+    homeAdvantage += (homeCtx.offenseRating - awayCtx.defenseRating) * 0.1;
+    homeAdvantage -= (awayCtx.offenseRating - homeCtx.defenseRating) * 0.1;
+
+    // Recent form
+    if (homeCtx.recentForm === "hot") homeAdvantage += 2;
+    if (homeCtx.recentForm === "cold") homeAdvantage -= 2;
+    if (awayCtx.recentForm === "hot") homeAdvantage -= 2;
+    if (awayCtx.recentForm === "cold") homeAdvantage += 2;
+
+    // Injuries
+    const homeInjuries = homeCtx.injuredPlayers.filter((p: any) => p.status === "out").length;
+    const awayInjuries = awayCtx.injuredPlayers.filter((p: any) => p.status === "out").length;
+    homeAdvantage -= homeInjuries * 3;
+    homeAdvantage += awayInjuries * 3;
+  }
+
+  // Base scores from team ratings
+  const homeBase = homeCtx ? homeCtx.offenseRating : 110;
+  const awayBase = awayCtx ? awayCtx.offenseRating : 110;
+
+  // Adjust scores based on advantage
+  const advantageFactor = homeAdvantage / 10; // Convert to decimal
+  const homeScore = Math.max(85, Math.min(140, homeBase + advantageFactor * 15 + (Math.random() - 0.5) * 20));
+  const awayScore = Math.max(85, Math.min(140, awayBase - advantageFactor * 15 + (Math.random() - 0.5) * 20));
 
   const totalScore = homeScore + awayScore;
   const predictedWinner = homeScore > awayScore ? homeTeam : awayTeam;
   const losingTeam = homeScore > awayScore ? awayTeam : homeTeam;
-  const confidence = Math.floor(Math.random() * 20) + 58; // 58-78%
+
+  // Calculate confidence based on margin and factors
+  const margin = Math.abs(homeScore - awayScore);
+  let confidence = 60 + margin * 0.5; // Base confidence from margin
+  if (homeCtx && awayCtx) {
+    if (homeCtx.recentForm === "hot" && awayCtx.recentForm === "cold") confidence += 5;
+    if (homeCtx.recentForm === "cold" && awayCtx.recentForm === "hot") confidence -= 5;
+    confidence += Math.abs(homeCtx.offenseRating - awayCtx.defenseRating) * 0.1;
+  }
+  confidence = Math.max(55, Math.min(85, confidence));
 
   // Get player names if available
   let winnerStars = "star players";
   let loserStars = "key scorers";
-  let winnerDefense = "defense";
-  let loserOffense = "offense";
 
   if (teamContextModule) {
     const winnerTeamCtx = teamContextModule.getTeamContext(predictedWinner);

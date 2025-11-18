@@ -209,9 +209,9 @@ function computeWindowStatusPerSport() {
   const hourUtc = now.getUTCHours();
   const minuteUtc = now.getUTCMinutes();
 
-  // NBA window: 06:00–23:30 UTC
+  // NBA window: 06:00–21:00 UTC
   const utcMinutes = hourUtc * 60 + minuteUtc;
-  const openNBA = utcMinutes >= 360 && utcMinutes < 1410; // 360 = 6*60, 1410 = 23*60+30
+  const openNBA = utcMinutes >= 360 && utcMinutes < 1260; // 360 = 6*60, 1260 = 21*60
   const openSoccer = hourUtc >= 18 || hourUtc < 9; // 18:00..23:59 OR 00:00..08:59 UTC
 
   // compute next change target (a Date object) — return a JS Date in UTC/local timezone (same epoch)
@@ -1366,7 +1366,7 @@ export default function Page() {
                                       </button>
                                       {!canBuy && (
                                         <div className="text-xs opacity-60 mt-1">
-                                          {buyableFromInfo}
+                                          {ev.buyableFrom || buyableFromInfo}
                                         </div>
                                       )}
                                     </>

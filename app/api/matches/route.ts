@@ -1,5 +1,6 @@
 // app/api/matches/route.ts
 import { NextResponse } from "next/server";
+import { getNBAWindowStatus } from "@/lib/nbaWindowManager";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -64,6 +65,7 @@ export async function GET(req: Request) {
         .select('*');
 
       if (!nbaError && Array.isArray(nbaData)) {
+        const windowStatus = getNBAWindowStatus();
         const nbaMatches = nbaData.map((e: any) => {
           // Check if match is within 24 hours and upcoming
           const eventTime = new Date(e.event_date);
@@ -71,6 +73,13 @@ export async function GET(req: Request) {
           const timeDiff = eventTime.getTime() - now.getTime();
           const isWithin24h = timeDiff > 0 && timeDiff <= 24 * 60 * 60 * 1000;
           const isUpcoming = eventTime > now;
+
+          let buyableFrom: string | null = null;
+          if (!windowStatus.isOpen) {
+            buyableFrom = "Available when window open";
+          } else if (!isWithin24h) {
+            buyableFrom = "Available 24 Hours before Match";
+          }
 
           return {
             id: e.event_id || e.id,
@@ -81,7 +90,8 @@ export async function GET(req: Request) {
             venue: e.venue || null,
             homeScore: e.home_score,
             awayScore: e.away_score,
-            buyable: isUpcoming && isWithin24h,
+            buyable: isUpcoming && isWithin24h && windowStatus.isOpen,
+            buyableFrom,
             status: e.status || null,
             created_at: e.created_at,
             raw: e,
