@@ -128,6 +128,15 @@ async function insertSoccerMatches(matches) {
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+    // Cleanup: Delete NBA matches, past matches, and non-EPL/La Liga records
+    const todayStr = new Date().toISOString().slice(0, 10);
+    // Delete NBA matches
+    await supabase.from('soccer_matches_pending').delete().ilike('league', '%nba%');
+    // Delete matches with event_date before today
+    await supabase.from('soccer_matches_pending').delete().lt('event_date', todayStr);
+    // Delete matches not EPL or La Liga
+    await supabase.from('soccer_matches_pending').delete().not('league', 'in', ['English Premier League', 'Spanish La Liga']);
+
     if (matches.length > 0) {
       const { error } = await supabase.from('soccer_matches_pending').upsert(matches, { onConflict: 'event_id' });
       if (error) {

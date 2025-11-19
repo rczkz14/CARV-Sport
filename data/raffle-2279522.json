@@ -1,0 +1,26 @@
+{
+  "eventId": "2279522",
+  "matchDetails": {
+    "home": "Valencia",
+    "away": "Levante",
+    "league": "Spanish La Liga",
+    "datetime": "2025-11-21T20:00:00+00:00",
+    "venue": "Estadio de Mestalla"
+  },
+  "prediction": {
+    "predictedScore": "1-2",
+    "totalScore": 3,
+    "predictedWinner": "Levante",
+    "confidence": 65,
+    "review": "MATCH PREDICTION: Valencia vs Levante\n\nMatchup analysis unavailable.\n\nSCORE PREDICTION: 1-2\nOVER/UNDER PREDICTION: Over 2.5\nPREDICTED WINNER: Levante\nCONFIDENCE: 65%\n\nTACTICAL ANALYSIS:\nA match decided by moments rather than sustained pressure. Levante takes their chance, Valencia doesn't. Classic tale of clinical finishing versus profligacy. Levante's defensive shape breaks down when pressed high up the pitch. Valencia excels at controlling tempo but struggles when forced to be direct. Exhaustion sets in late, leading to defensive lapses and inevitable late goals.\n\nThis prediction considers current form, historical performance, key player availability, and tactical matchups. Soccer outcomes can be unpredictable, but this analysis provides a professional assessment based on available data.",
+    "generatedAt": "2025-11-19T04:40:08.383Z"
+  },
+  "predictionText": "Prediction\n\n🏀 Valencia vs Levante\nPredicted Score: 1-2\nTotal Score: 3\nPredicted Winner: Levante\nConfidence: 65%\n\nReview:\nMATCH PREDICTION: Valencia vs Levante\n\nMatchup analysis unavailable.\n\nSCORE PREDICTION: 1-2\nOVER/UNDER PREDICTION: Over 2.5\nPREDICTED WINNER: Levante\nCONFIDENCE: 65%\n\nTACTICAL ANALYSIS:\nA match decided by moments rather than sustained pressure. Levante takes their chance, Valencia doesn't. Classic tale of clinical finishing versus profligacy. Levante's defensive shape breaks down when pressed high up the pitch. Valencia excels at controlling tempo but struggles when forced to be direct. Exhaustion sets in late, leading to defensive lapses and inevitable late goals.\n\nThis prediction considers current form, historical performance, key player availability, and tactical matchups. Soccer outcomes can be unpredictable, but this analysis provides a professional assessment based on available data.\n\nGenerated: 2025-11-19T04:40:08.383Z",
+  "actualWinner": null,
+  "actualResult": null,
+  "isCorrect": null,
+  "homeScore": null,
+  "awayScore": null,
+  "status": null,
+  "createdAt": "2025-11-19T04:40:08.383Z"
+}

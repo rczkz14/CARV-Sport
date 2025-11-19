@@ -54,47 +54,29 @@ export async function GET(req: Request) {
     // 1. Get locked selection from Supabase (primary) or fallback to local file
     let lockedIds: string[] = [];
 
-    // Try Supabase first
-    const { visibilityStartWIB } = getSoccerDateRangeWIB(nowUtc);
-    const { data: lockedSelection, error: lockError } = await supabase
-      .from('soccer_locked_selections')
-      .select('match_ids')
-      .eq('visibility_start_date', visibilityStartWIB)
-      .single();
+    // Skip locked selection for now, go directly to fallback
+    console.log('[Auto-Predict Soccer] Skipping locked selection, falling back to all soccer_matches_pending.');
 
-    if (!lockError && lockedSelection?.match_ids && Array.isArray(lockedSelection.match_ids)) {
-      lockedIds = lockedSelection.match_ids;
-      console.log('[Auto-Predict Soccer] Found locked selection in Supabase:', lockedIds);
-    } else {
-      console.log('[Auto-Predict Soccer] No locked selection in Supabase, trying local file...');
-      // Fallback to local file
-      lockedIds = await getLockedSoccerSelection() || [];
+    // Fallback: Get all event_ids from soccer_matches_pending
+    const { data: pendingIdsData, error } = await supabase
+      .from('soccer_matches_pending')
+      .select('event_id');
+    if (error) {
+      console.error('[Auto-Predict Soccer] Error fetching pending matches:', error.message);
+      return NextResponse.json({
+        ok: false,
+        message: "Failed to fetch pending matches",
+        generatedCount: 0
+      }, { status: 500 });
     }
-
-    if (!lockedIds || lockedIds.length === 0) {
-      console.log('[Auto-Predict Soccer] No locked selection found anywhere. Falling back to all soccer_matches_pending.');
-
-      // Fallback: Get all event_ids from soccer_matches_pending
-      const { data: pendingMatches, error } = await supabase
-        .from('soccer_matches_pending')
-        .select('event_id');
-      if (error) {
-        console.error('[Auto-Predict Soccer] Error fetching pending matches:', error.message);
-        return NextResponse.json({
-          ok: false,
-          message: "No locked selection and failed to fetch pending matches",
-          generatedCount: 0
-        }, { status: 500 });
-      }
-      lockedIds = pendingMatches?.map(m => m.event_id) || [];
-      console.log('[Auto-Predict Soccer] Fallback lockedIds:', lockedIds);
-      if (lockedIds.length === 0) {
-        return NextResponse.json({
-          ok: false,
-          message: "No matches found in soccer_matches_pending",
-          generatedCount: 0
-        }, { status: 400 });
-      }
+    lockedIds = pendingIdsData?.map(m => m.event_id) || [];
+    console.log('[Auto-Predict Soccer] Fallback lockedIds:', lockedIds);
+    if (lockedIds.length === 0) {
+      return NextResponse.json({
+        ok: false,
+        message: "No matches found in soccer_matches_pending",
+        generatedCount: 0
+      }, { status: 400 });
     }
 
     console.log(`[Auto-Predict Soccer] Found locked selection: ${lockedIds.join(', ')}`);
